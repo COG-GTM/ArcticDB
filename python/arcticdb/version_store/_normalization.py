@@ -162,8 +162,9 @@ class FrameData(
 # Yet, this has changed in Pandas 2.0 and other resolution can be used,
 # i.e. Pandas >= 2.0 will also provides `datetime64[us]`, `datetime64[ms]` and `datetime64[s]`.
 # See: https://pandas.pydata.org/docs/dev/whatsnew/v2.0.0.html#construction-with-datetime64-or-timedelta64-dtype-with-unsupported-resolution  # noqa: E501
-# TODO: for the support of Pandas>=2.0, convert any `datetime` to `datetime64[ns]` before-hand and do not
-# rely uniquely on the resolution-less 'M' specifier if it this doable.
+# For Pandas >= 2.0 support, all datetime64 values are converted to datetime64[ns] in `_to_primitive`
+# (see the `np.issubdtype(arr.dtype, np.datetime64)` branch below) rather than relying on the
+# resolution-less 'M' specifier.
 DTN64_DTYPE = "datetime64[ns]"
 
 # All possible value of the "object" dtype for pandas.Series.
@@ -174,8 +175,9 @@ _SUPPORTED_NATIVE_RETURN_TYPES = Union[FrameData]
 
 
 def _accept_array_string(v):
-    # TODO remove this once arctic keeps the string type under the hood
-    # and does not transform string into bytes
+    # ArcticDB internally stores str as UTF8_FIXED and bytes as ASCII_FIXED, so both types are
+    # accepted. This can be simplified to only check `str` once bytes columns are no longer
+    # accepted on write (i.e. the C++ layer only stores UTF-8 strings).
     return type(v) in (str, bytes)
 
 
@@ -259,11 +261,10 @@ def _to_primitive(arr, arr_name, dynamic_strings, string_max_len=None, coerce_co
         # to `datetime64[ns]`.
         arr = arr.astype(DTN64_DTYPE, copy=False)
 
-    # TODO(jjerphan): Remove once pandas < 2 is not supported anymore.
+    # Pandas < 2 compat: remove this block when the minimum supported pandas version is >= 2.0.
+    # In Pandas < 2, empty series dtype is "float", but as of Pandas 2.0, empty series dtype is "object".
+    # We cast to "object" so that the EMPTY type can be used and the type can be promoted correctly.
     if not IS_PANDAS_TWO and len(arr) == 0 and arr.dtype == "float":
-        # In Pandas < 2, empty series dtype is `"float"`, but as of Pandas 2.0, empty series dtype is `"object"`
-        # We cast its array to `"object"` so that the EMPTY type can be used, and the type can be promoted correctly
-        # then.
         return arr.astype("object")
 
     if arr.dtype.hasobject is False and not (
@@ -571,7 +572,8 @@ def _normalize_columns(
 ):
     if index_names is None:
         index_names = []
-    # TODO optimize this away when RangeIndex for columns and gen in c++
+    # Perf: this Python-side str conversion could be moved to C++ when RangeIndex columns are
+    # generated natively in the C++ normalization layer.
     columns_names_norm = list(map(str, columns_names))
     if not isinstance(columns_names, RangeIndex):
         if coerce_columns is not None and (set(columns_names_norm) != set(coerce_columns.keys())):
@@ -857,8 +859,10 @@ class ArrowTableNormalizer(Normalizer):
             if index_meta.is_physically_stored or not index_meta.step:
                 if index_meta.tz and len(item.columns) > 0 and pa.types.is_timestamp(item.columns[0].type):
                     # We apply timezone metadata only when the first column is a timestamp column.
-                    # This matches the behavior and is required to handle `groupby`s which can change index type.
-                    # TODO: This is still not correct if grouping by a timestamp column. Monday ref: 18197986461
+                    # This matches the behavior and is required to handle `groupby`s which can change
+                    # index type. Known limitation: timezone is still misapplied when grouping by a
+                    # timestamp column, because the groupby result replaces the original index with
+                    # the groupby key. (Monday ref: 18197986461)
                     timezones[0] = index_meta.tz
                 if index_meta.fake_name:
                     renames_for_pandas_metadata[0] = None
@@ -1114,12 +1118,13 @@ class DataFrameNormalizer(_PandasNormalizer):
                 for idx, a in enumerate(arrays):
                     if idx < n_ind:
                         continue
-                    # In Pandas 1 the dtype param of make_block is ignored for empty blocks and the dtype is always object
-                    # Pre-empty type Arctic has a default dtype of float64 for empty columns. Thus a casting to float64
-                    # is needed.
-                    # Note: empty datetime cannot be cast to float64
-                    # TODO: Remove the casting after empty types become the only option
-                    # Issue: https://github.com/man-group/ArcticDB/issues/1562
+                    # Pandas < 2 compat: in Pandas 1 the dtype param of make_block is ignored for
+                    # empty blocks and the dtype is always object. Pre-empty-type ArcticDB has a
+                    # default dtype of float64 for empty columns, so we cast to float64.
+                    # Note: empty datetime cannot be cast to float64.
+                    # Remove this cast when empty types become the only option (i.e. `empty_types`
+                    # defaults to True) or when the minimum supported pandas version is >= 2.0.
+                    # See: https://github.com/man-group/ArcticDB/issues/1562
                     block = make_block(values=a.reshape((1, _len)), placement=(column_placement_in_block,))
                     yield (
                         block.astype(np.float64)
@@ -1184,12 +1189,12 @@ class DataFrameNormalizer(_PandasNormalizer):
             #       df = DataFrame(index=index, columns=columns_mapping, copy=False)
             #
             if not IS_PANDAS_TWO:
-                # TODO(jjerphan): Remove once pandas < 2 is not supported anymore.
-                # Before Pandas 2.0, empty series' dtype was float, but as of Pandas 2.0. empty series' dtype became object.
-                # See: https://github.com/pandas-dev/pandas/issues/17261
-                # EMPTY type column are returned as pandas.Series with "object" dtype to match Pandas 2.0 default.
-                # We cast it back to "float" so that it matches Pandas 1.0 default for empty series.
-                # Moreover, we explicitly provide the index otherwise Pandas 0.X overrides it for a RangeIndex
+                # Pandas < 2 compat: remove this block when the minimum supported pandas version
+                # is >= 2.0. Before Pandas 2.0, empty series' dtype was float, but as of 2.0 it
+                # became object. See: https://github.com/pandas-dev/pandas/issues/17261
+                # EMPTY type columns are returned as pandas.Series with "object" dtype to match
+                # Pandas 2.0 default. We cast back to "float" to match Pandas < 2 default.
+                # We also explicitly provide the index otherwise Pandas 0.X overrides it.
                 empty_columns_names = (
                     []
                     if data is None
@@ -1430,9 +1435,9 @@ class MsgPackNormalizer(Normalizer):
     def _ext_hook(self, code, data):
         if code == MsgPackSerialization.PD_TIMESTAMP:
             data = unpackb(data, raw=False)
-            # TODO: Pandas by default interprets the `tz` string argument as `pytz`.
-            # We should instead use `ZoneInfo` but this will be an API break.
-            # See discussion here: https://github.com/pandas-dev/pandas/issues/34916#issuecomment-1595154742
+            # Known limitation: Pandas interprets the `tz` string as a pytz timezone. Migrating to
+            # `ZoneInfo` would be an API break; revisit when pandas drops pytz support.
+            # See: https://github.com/pandas-dev/pandas/issues/34916#issuecomment-1595154742
             return pd.Timestamp(data[0], tz=data[1]) if data[1] is not None else pd.Timestamp(data[0])
 
         if code == MsgPackSerialization.PY_DATETIME:
@@ -1603,7 +1608,9 @@ class CompositeNormalizer(Normalizer):
         )
 
     def get_normalizer_for_type(self, item, allow_arrow_input=False):
-        # TODO: this should use customcompositenormalizer as well.
+        # Design note: the type-dispatch below is hardcoded; a registry-based approach (e.g. a
+        # user-configurable composite normalizer) would allow external types to be registered
+        # without modifying this method.
         if isinstance(item, DataFrame):
             if (
                 item.empty
@@ -1875,13 +1882,13 @@ def restrict_data_to_date_range_only(
     elif _PYARROW_AVAILABLE and isinstance(data, pa.Table):
         check(index_column is not None, "Cannot update with pyarrow Table without specifying index column")
         if not data.column(index_column).type.tz:
-            # Matches pandas behavior to strip the timezone if index column is timezone naive.
-            # TODO: This is potentially surprising and we should consider raising when comparing
-            # naive vs timezone aware timestamps. (monday ref: 11669271306)
+            # Matches pandas behavior: strip timezone when the index column is timezone-naive.
+            # Note: silently comparing naive vs timezone-aware timestamps may be surprising;
+            # consider raising an error instead. (Monday ref: 11669271306)
             start, end = _strip_tz(start, end)
-        # Assumes index column is sorted.
-        # TODO: Decide on a consistent way to deal with unsorted index column. E.g. a flag `validate_index`
-        # which will enable the index sortedness check. (monday ref: 11668250872)
+        # Assumes index column is sorted. Unlike the pandas path above, no sortedness check is
+        # performed here. A `validate_index` flag could enable consistent validation across both
+        # pandas and Arrow paths. (Monday ref: 11668250872)
         data = _filter_pyarrow_table_to_date_range(data, index_column, start, end)
     else:  # non-Pandas, try to slice it anyway
         if not getattr(data, "timezone", None):
