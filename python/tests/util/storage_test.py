@@ -11,6 +11,7 @@ from datetime import datetime
 import ssl
 
 from arcticdb import Arctic
+from arcticdb.util.test import create_df
 from arcticc.pb2.s3_storage_pb2 import Config as S3Config
 
 try:
@@ -23,18 +24,6 @@ except ModuleNotFoundError:
     except ImportError:
         # patch until arcticdb.util.marks.py becomes part of release
         PERSISTENT_STORAGE_TESTS_ENABLED = os.getenv("ARCTICDB_PERSISTENT_STORAGE_TESTS") == "1"
-
-
-# TODO: Remove this when the latest version that we support
-# contains the create_df function from the arcticdb.util.test library
-def create_df(start=0, columns=1) -> pd.DataFrame:
-    data = {}
-    for i in range(columns):
-        col_name = chr(ord("x") + i)  # Generates column names like 'x', 'y', 'z', etc.
-        data[col_name] = np.arange(start + i * 10, start + (i + 1) * 10, dtype=np.int64)
-
-    index = np.arange(start, start + 10, dtype=np.int64)
-    return pd.DataFrame(data, index=index)
 
 
 def get_basic_dfs():
@@ -426,7 +415,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     job_type = str(args.type).lower()
-    # TODO: Add support for other storages
     uri = get_real_uri()
     ac = Arctic(uri)
     print(f"Storage type: {persistent_test_type()}")

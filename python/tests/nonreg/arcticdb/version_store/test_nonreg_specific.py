@@ -452,11 +452,11 @@ def test_update_index_overlap_corner_cases(lmdb_version_store_tiny_segment, inde
     lib.write(sym, initial_df)
     lib.update(sym, update_df)
 
-    # TODO: Use dataframe_arctic_update once #1951 is merged
-    chunks = []
-    chunks.append(initial_df[initial_df.index < index[0]])
-    chunks.append(update_df)
-    chunks.append(initial_df[initial_df.index > index[1]])
+    chunks = [
+        initial_df[initial_df.index < index[0]],
+        update_df,
+        initial_df[initial_df.index > index[1]],
+    ]
     expected_df = pd.concat(chunks)
     received_df = lib.read(sym).data
     assert_frame_equal(expected_df, received_df)

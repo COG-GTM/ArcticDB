@@ -114,7 +114,6 @@ def test_incomplete_append_partial_read(version_store_factory, colnum, periods, 
 @pytest.mark.parametrize(
     "initial, append, match",
     [
-        # (InputFactories.DF_RC_NON_RANGE, InputFactories.DF_DTI, "TODO(AN-722)"),
         (InputFactories.DF_RC, InputFactories.ND_ARRAY_1D, "DataFrame"),
         (InputFactories.DF_RC, InputFactories.DF_MULTI_RC, "incompatible"),
         (

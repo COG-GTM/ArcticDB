@@ -33,8 +33,7 @@ def test_group_on_float_column_with_nans(lmdb_version_store_v1, any_output_forma
     generic_aggregation_test(lib, symbol, df, "grouping_column", {"agg_column": "sum"})
 
 
-# TODO: Add first and last once un-feature flagged
-@pytest.mark.parametrize("aggregator", ("sum", "min", "max", "mean", "count"))
+@pytest.mark.parametrize("aggregator", ("sum", "min", "max", "mean", "count", "first", "last"))
 def test_aggregate_float_columns_with_nans(lmdb_version_store_v1, any_output_format, aggregator):
     lib = lmdb_version_store_v1
     lib._set_output_format_for_pipeline_tests(any_output_format)

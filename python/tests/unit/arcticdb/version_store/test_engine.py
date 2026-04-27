@@ -97,10 +97,16 @@ def test_partial_write_non_contiguous(version_store_factory, colnum, rownum, col
 
     sid = "XXX"
     version_store.write(sid, df)
-    # TODO add row-range limitation
     vit = version_store.read(sid)
     expected = df
     nt.assert_array_equal(vit.data.values, expected.values)
+
+    # Verify row-range reads return the expected subset
+    num_rows = len(df)
+    if num_rows >= 2:
+        row_range = (0, num_rows // 2)
+        vit_range = version_store.read(sid, row_range=row_range)
+        nt.assert_array_equal(vit_range.data.values, df.iloc[row_range[0] : row_range[1]].values)
 
 
 @pytest.mark.parametrize("colnum,rownum,cols,tsbounds", gen_params())

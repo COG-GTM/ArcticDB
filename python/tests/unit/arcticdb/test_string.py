@@ -8,7 +8,7 @@ As of the Change Date specified in that file, in accordance with the Business So
 
 import numpy as np
 from numpy.testing import assert_equal
-import platform
+
 import pandas as pd
 import pytest
 
@@ -121,41 +121,39 @@ def test_dynamic_string_list():
 
 
 def test_fixed_string_simple():
-    # TODO these are not the same in python3
-    if platform.python_version_tuple()[0] == "2":
-        a = np.array(["abc", "xy"])
-        fields = [FieldDescriptor(TypeDescriptor(DataType.NANOSECONDS_UTC64, Dimension.Dim0), "time")]
-        dim = Dimension.Dim1
-        fields.append(FieldDescriptor(TypeDescriptor(DataType.ASCII_FIXED64, dim), "string"))
-        tsd = StreamDescriptor(123, IndexDescriptor(1, IndexKind.TIMESTAMP), fields)
-        sh = SegmentHolder()
-        agg = FixedTimestampAggregator(sh, tsd)
-        assert agg.row_count == 0
+    a = np.array(["abc", "xy"])
+    fields = [FieldDescriptor(TypeDescriptor(DataType.NANOSECONDS_UTC64, Dimension.Dim0), "time")]
+    dim = Dimension.Dim1
+    fields.append(FieldDescriptor(TypeDescriptor(DataType.ASCII_FIXED64, dim), "string"))
+    tsd = StreamDescriptor(123, IndexDescriptor(1, IndexKind.TIMESTAMP), fields)
+    sh = SegmentHolder()
+    agg = FixedTimestampAggregator(sh, tsd)
+    assert agg.row_count == 0
 
-        ts1 = 123
-        s1 = np.array(["Hello world", "Banana", "Wombat"])
-        with agg.start_row(ts1) as rb:
-            rb.set_string_array(1, s1)
+    ts1 = 123
+    s1 = np.array(["Hello world", "Banana", "Wombat"])
+    with agg.start_row(ts1) as rb:
+        rb.set_string_array(1, s1)
 
-        ts2 = 124
-        s2 = np.array(["Magic", "Hoverfly", "Here is a string"])
-        with agg.start_row(ts2) as rb:
-            rb.set_string_array(1, s2)
+    ts2 = 124
+    s2 = np.array(["Magic", "Hoverfly", "Here is a string"])
+    with agg.start_row(ts2) as rb:
+        rb.set_string_array(1, s2)
 
-        assert agg.row_count == 2
-        agg.commit()
-        assert agg.row_count == 0
-        rd = TickReader()
-        rd.add_segment(sh.segment)
-        assert rd.row_count == 2
+    assert agg.row_count == 2
+    agg.commit()
+    assert agg.row_count == 0
+    rd = TickReader()
+    rd.add_segment(sh.segment)
+    assert rd.row_count == 2
 
-        (rts1, rs1) = rd.at(0)
-        assert ts1 == rts1
-        assert_equal(s1, rs1)
+    (rts1, rs1) = rd.at(0)
+    assert ts1 == rts1
+    assert_equal(s1, rs1)
 
-        (rts2, rs2) = rd.at(1)
-        assert ts2 == rts2
-        assert_equal(s2, rs2)
+    (rts2, rs2) = rd.at(1)
+    assert ts2 == rts2
+    assert_equal(s2, rs2)
 
 
 def test_write_fixed_coerce_dynamic(lmdb_version_store):

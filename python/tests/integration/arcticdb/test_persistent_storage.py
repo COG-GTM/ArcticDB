@@ -50,7 +50,7 @@ def shared_persistent_arctic_client(request):
         pytest.skip("No persistence tests selected or error during configuration.")
 
 
-# TODO: Add a check if the real storage tests are enabled
+@pytest.mark.skipif(not PERSISTENT_STORAGE_TESTS_ENABLED, reason="Real storage tests not enabled")
 @pytest.mark.parametrize("library", LIBRARIES)
 @pytest.mark.storage
 def test_real_storage_read(shared_persistent_arctic_client, library):
