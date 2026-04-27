@@ -9,7 +9,6 @@ As of the Change Date specified in that file, in accordance with the Business So
 import copy
 import datetime
 import os
-from warnings import warn
 
 import pytz
 from enum import Enum, auto
@@ -3276,11 +3275,6 @@ class Library:
         -------
         bool
         """
-        warn(
-            "is_symbol_fragmented is deprecated. Use compact_data_experimental instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         return self._nvs.is_symbol_fragmented(symbol, segment_size)
 
     def defragment_symbol_data(
@@ -3350,11 +3344,6 @@ class Library:
         Config map setting - SymbolDataCompact.SegmentCount will be replaced by a library setting
         in the future. This API will allow overriding the setting as well.
         """
-        warn(
-            "defragment_symbol_data is deprecated. Use compact_data_experimental instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
         return self._nvs.defragment_symbol_data(symbol, segment_size, prune_previous_versions)
 
     def merge_experimental(
