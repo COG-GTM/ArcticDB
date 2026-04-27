@@ -47,7 +47,7 @@ class RefKey {
 
     friend bool operator!=(const RefKey& l, const RefKey& r) { return !(l == r); }
 
-    // TODO Neither key sorts by type
+    // Sorts by id only; neither RefKey nor AtomKeyImpl includes key type in ordering
     friend bool operator<(const RefKey& l, const RefKey& r) { return l.id() < r.id(); }
 
     std::string_view view() const {
@@ -82,7 +82,7 @@ struct formatter<RefKey> {
 
 } // namespace fmt
 
-// TODO this is operating on the pretty-printed version and is needlessly inefficient
+// PERF: Hashing the pretty-printed string is inefficient; consider hashing fields directly
 namespace std {
 template<>
 struct hash<arcticdb::entity::RefKey> {

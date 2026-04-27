@@ -101,7 +101,7 @@ class SegmentAggregator : public Aggregator<Index, Schema, SegmentingPolicy, Den
                 Sparsity::PERMITTED) { // static schema must have all columns as column slicing is removed
                 auto descriptor = AggregatorType::default_descriptor();
                 for (const auto& field : AggregatorType::segment().fields()) { // segment's index is not set up here
-                    if (!descriptor.find_field(field.name())) {                // TODO: Bottleneck for wide segments
+                    if (!descriptor.find_field(field.name())) {                // PERF: O(n) lookup is a bottleneck for wide segments
                         descriptor.add_field(field); // dynamic schema's default descriptor has no data column
                     }
                 }

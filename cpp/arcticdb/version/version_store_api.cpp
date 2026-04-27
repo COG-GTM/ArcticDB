@@ -659,7 +659,7 @@ VersionedItem PythonVersionStore::write_partitioned_dataframe(
     auto [maybe_prev, deleted] = ::arcticdb::get_latest_version(store(), version_map(), stream_id);
     auto version_id = get_next_version_from_key(maybe_prev);
 
-    //    TODO: We are not actually partitioning stuff atm, just assuming a single partition is passed for now.
+    // Currently assumes a single partition is passed; multi-partition support not yet implemented
     std::array<py::object, 1> partitioned_dfs{item};
 
     auto write_options = get_write_options();
@@ -701,7 +701,7 @@ VersionedItem PythonVersionStore::write_partitioned_dataframe(
 
     multi_index_agg.commit();
     return {to_atom(std::move(multi_key_fut).get())};
-    //    TODO: now store this in the version key for this symbol
+    // Partition multi-key is not yet stored in the version key for this symbol
 }
 
 VersionedItem PythonVersionStore::write_versioned_composite_data(
@@ -717,7 +717,7 @@ VersionedItem PythonVersionStore::write_versioned_composite_data(
     ARCTICDB_DEBUG(
             log::version(), "write_versioned_composite_data for stream_id: {} , version_id = {}", stream_id, version_id
     );
-    // TODO: Assuming each sub key is always going to have the same version attached to it.
+    // All sub keys share the same version_id from the parent symbol
     std::vector<VersionId> version_ids;
     version_ids.reserve(sub_keys.size());
 

@@ -63,7 +63,7 @@ inline NumericId safe_convert_to_numeric_id(uint64_t input) {
 using UnicodeType = wchar_t;
 constexpr size_t UNICODE_WIDTH = sizeof(UnicodeType);
 constexpr size_t ASCII_WIDTH = 1;
-// TODO: Fix unicode width for windows
+// Windows has 2-byte wchar_t; this assertion only applies to non-Windows platforms
 #ifndef _WIN32
 static_assert(UNICODE_WIDTH == 4, "Only support python platforms where unicode width is 4");
 #endif
@@ -292,14 +292,9 @@ constexpr ValueType get_value_type(char specifier) noexcept {
         return ValueType::FLOAT; //  floating-point
     case 'b':
         return ValueType::BOOL; //  boolean
-        // NOTE: this is safe as of Pandas < 2.0 because `datetime64` _always_ has been using nanosecond resolution,
-        // i.e. Pandas < 2.0 _always_ provides `datetime64[ns]` and ignores any other resolution.
-        // Yet, this has changed in Pandas 2.0 and other resolution can be used,
-        // i.e. Pandas >= 2.0 will also provides `datetime64[us]`, `datetime64[ms]` and `datetime64[s]`.
-        // See:
-        // https://pandas.pydata.org/docs/dev/whatsnew/v2.0.0.html#construction-with-datetime64-or-timedelta64-dtype-with-unsupported-resolution
-        // TODO: for the support of Pandas>=2.0, convert any `datetime` to `datetime64[ns]` before-hand and do not
-        // rely uniquely on the resolution-less 'M' specifier if it this doable.
+        // Pandas < 2.0 always uses datetime64[ns]. Pandas >= 2.0 also supports [us], [ms], [s] resolutions.
+        // See: https://pandas.pydata.org/docs/dev/whatsnew/v2.0.0.html#construction-with-datetime64-or-timedelta64-dtype-with-unsupported-resolution
+        // Pandas >= 2.0 datetime resolution support would require handling the 'M' specifier per-resolution.
     case 'M':
         return ValueType::NANOSECONDS_UTC; //  datetime // numpy doesn't support the buffer protocol for datetime64
     case 'U':
@@ -323,14 +318,9 @@ constexpr char get_dtype_specifier(ValueType vt) {
         return 'f';
     case ValueType::BOOL:
         return 'b';
-        // NOTE: this is safe as of Pandas < 2.0 because `datetime64` _always_ has been using nanosecond resolution,
-        // i.e. Pandas < 2.0 _always_ provides `datetime64[ns]` and ignores any other resolution.
-        // Yet, this has changed in Pandas 2.0 and other resolution can be used,
-        // i.e. Pandas >= 2.0 will also provides `datetime64[us]`, `datetime64[ms]` and `datetime64[s]`.
-        // See:
-        // https://pandas.pydata.org/docs/dev/whatsnew/v2.0.0.html#construction-with-datetime64-or-timedelta64-dtype-with-unsupported-resolution
-        // TODO: for the support of Pandas>=2.0, convert any `datetime` to `datetime64[ns]` before-hand and do not
-        // rely uniquely on the resolution-less 'M' specifier if it this doable.
+        // Pandas < 2.0 always uses datetime64[ns]. Pandas >= 2.0 also supports [us], [ms], [s] resolutions.
+        // See: https://pandas.pydata.org/docs/dev/whatsnew/v2.0.0.html#construction-with-datetime64-or-timedelta64-dtype-with-unsupported-resolution
+        // Pandas >= 2.0 datetime resolution support would require handling the 'M' specifier per-resolution.
     case ValueType::NANOSECONDS_UTC:
         return 'M';
     case ValueType::UTF8_FIXED:

@@ -27,8 +27,8 @@ bool trivially_compatible_types(const entity::TypeDescriptor& left, const entity
         return true;
 
     if (is_sequence_type(left.data_type()) && is_sequence_type(right.data_type())) {
-        // TODO coercion of utf strings is not always safe, should allow safe conversion and reinstate the
-        // stronger requirement for trivial conversion below.
+        // UTF string coercion is not always safe; the stronger trivial-compat check below is disabled until
+        // safe conversion between UTF and ASCII string types is properly implemented.
         //        if(!is_utf_type(slice_value_type(left.data_type)) &&
         //        !is_utf_type(slice_value_type(right.data_type)))
         //            return true;

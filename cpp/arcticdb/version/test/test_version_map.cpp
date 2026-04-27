@@ -1344,9 +1344,9 @@ TEST(VersionMap, CompactionUpdateCache) {
     assert_keys_in_entry_and_store(entry, 15, 20, 3);
     version_map->compact(store, id);
     assert_keys_in_entry_and_store(entry, 2, 20, 3);
-    // TODO: If we ever use compact_and_remove_deleted_indexes fix the below assertions (method is currently unused with
-    // TODOs to fix): version_map->compact_and_remove_deleted_indexes(store, id); assert_keys_in_entry_and_store(entry,
-    // 2, 17, 3);
+    // compact_and_remove_deleted_indexes is currently unused and untested; if re-enabled, uncomment and fix:
+    // version_map->compact_and_remove_deleted_indexes(store, id);
+    // assert_keys_in_entry_and_store(entry, 2, 17, 3);
 
     // Flush and reload to see that what we have in storage also matches what we have in the cache.
     version_map->flush();

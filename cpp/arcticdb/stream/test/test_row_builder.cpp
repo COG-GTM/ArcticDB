@@ -59,7 +59,7 @@ TEST(RowBuilder, Basic) {
 
     ASSERT_EQ(2, agg.row_count());
 
-    // TODO uncomment this once rollback on segment is implemented
+    // Rollback on segment not yet implemented; re-enable when Aggregator::rollback_row is functional
     //    ASSERT_THROW(agg.start_row(timestamp{3})([](auto & rb){
     //       rb.set_scalar(1, 666.);
     //    }), std::invalid_argument);

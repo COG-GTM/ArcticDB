@@ -66,7 +66,7 @@ inline void merge_segments(std::vector<SegmentInMemory>& segments, SegmentInMemo
     for (auto& segment : segments) {
         ARCTICDB_DEBUG(log::version(), "Appending segment with {} rows", segment.row_count());
         for (const auto& field : segment.descriptor().fields()) {
-            if (!merged.column_index(field.name())) { // TODO: Bottleneck for wide segments
+            if (!merged.column_index(field.name())) { // PERF: O(n) lookup is a bottleneck for wide segments
                 auto pos = merged.add_column(field, 0, AllocationType::DYNAMIC);
                 if (is_sparse == Sparsity::NOT_PERMITTED) {
                     merged.column(pos).mark_absent_rows(merged.row_count());

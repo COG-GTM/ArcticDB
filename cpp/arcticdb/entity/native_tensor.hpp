@@ -169,7 +169,7 @@ ssize_t byte_offset_impl(const stride_t* strides, ssize_t i, Ix... index) {
     return i * strides[Dim] + byte_offset_impl<Dim + 1>(strides, index...);
 }
 
-// TODO is the conversion to a typed tensor really necessary for the codec part?
+// TypedTensor provides type-safe access and stride calculations used by the codec layer
 template<typename T>
 struct TypedTensor : public NativeTensor {
 
