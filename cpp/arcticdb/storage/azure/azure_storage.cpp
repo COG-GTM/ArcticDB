@@ -33,10 +33,9 @@ namespace azure {
 
 namespace detail {
 
-// TODO: fix this temporary workaround to read error code. azure-sdk-cpp client sometimes doesn't properly set the error
-// code.
-//  This issue has been raised on the sdk repo https://github.com/Azure/azure-sdk-for-cpp/issues/5369. Once fixed, we
-//  should no longer need the following function and would just read e.ErrorCode.
+// CHRIS-77: Temporary workaround to read error code. azure-sdk-cpp client sometimes doesn't properly set the error
+// code. Upstream issue: https://github.com/Azure/azure-sdk-for-cpp/issues/5369
+// Once fixed, we should no longer need the following function and would just read e.ErrorCode.
 std::string get_error_code(const Azure::Core::RequestFailedException& e) {
     auto error_code = e.ErrorCode;
 

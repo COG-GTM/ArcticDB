@@ -20,7 +20,7 @@
 
 namespace arcticdb::storage {
 
-// TODO cache invalidation
+// CHRIS-78: Implement cache invalidation strategy
 class ConfigCache {
   public:
     ConfigCache(const EnvironmentName& environment_name, const std::shared_ptr<ConfigResolver>& resolver) :

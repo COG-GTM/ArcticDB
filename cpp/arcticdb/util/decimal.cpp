@@ -219,7 +219,7 @@ Decimal::Decimal(std::string_view number) : data_{0} {
     // GCC and Clang have internal 2's complement __uint128_t.
     // MSVC does not have 128-bit integer, it has __m128, which is for SIMD.
     // Boost's uint128_t is not in two's complement, so it cannot be reinterpret_cast over the data.
-    // TODO: potential optimization for Clang/GCC would be to load it __uint128_t and reinterpret_cast
+    // CHRIS-83: potential optimization for Clang/GCC would be to load it __uint128_t and reinterpret_cast
     //  it over the array.
     const NumberComponents components(number);
     std::string_view number_to_parse(components.get_digits());

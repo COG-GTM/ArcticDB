@@ -10,8 +10,8 @@
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations" // TODO experiment with not needing this, at the moment the
-                                                           // non-deprecated version segfaults
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations" // CHRIS-84: rapidcheck state API deprecation warning;
+                                                           // non-deprecated API segfaults at pinned commit ff6af6f
 #include <rapidcheck.h>
 #include <rapidcheck/gtest.h>
 #include <rapidcheck/state.h>

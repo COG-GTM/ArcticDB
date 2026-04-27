@@ -82,7 +82,7 @@ struct Arbitrary<arcticdb::entity::StreamDescriptor> {
     }
 };
 
-// TODO rework this, it sucks
+// CHRIS-84: rework this generator for better coverage
 template<>
 struct Arbitrary<TestDataFrame> {
     static Gen<TestDataFrame> arbitrary() {

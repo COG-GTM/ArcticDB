@@ -484,7 +484,7 @@ inline PathInfo calculate_path_info(
     // Generally we get the key descriptor from the AtomKey, but in the case of iterating version journals
     // where we want to have a narrower prefix, we can use the info that it's a version journal and derive
     // the Descriptor.
-    // TODO: Set the IndexDescriptorImpl correctly
+    // CHRIS-78: Set the IndexDescriptorImpl correctly
     KeyDescriptor key_descriptor(
             prefix,
             is_ref_key_class(key_type) ? IndexDescriptorImpl::Type::UNKNOWN : IndexDescriptorImpl::Type::TIMESTAMP,

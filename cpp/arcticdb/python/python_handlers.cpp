@@ -116,7 +116,7 @@ void PythonBoolHandler::handle_type(
             m.source_type_desc_, field, data, decoded_data, decoded_data.opt_sparse_map(), encoding_version
     );
     // Calling `set_row_data` should be done after `sparse_map` is modified by `decode_field`.
-    // TODO: Refactor so that `last_logical_row` is inferred from sparse_map as described in #2932
+    // CHRIS-70: Refactor so that `last_logical_row` is inferred from sparse_map (upstream #2932)
     decoded_data.set_row_data(static_cast<ssize_t>(m.num_rows_) - 1);
 
     convert_type(decoded_data, dest_column, m, shared_data, handler_data, string_pool, read_options);
@@ -191,7 +191,7 @@ void PythonStringHandler::handle_type(
             m.source_type_desc_, field, data, decoded_data, decoded_data.opt_sparse_map(), encoding_version
     );
     // Calling `set_row_data` should be done after `sparse_map` is modified by `decode_field`.
-    // TODO: Refactor so that `last_logical_row` is inferred from sparse_map as described in #2932
+    // CHRIS-70: Refactor so that `last_logical_row` is inferred from sparse_map (upstream #2932)
     decoded_data.set_row_data(static_cast<ssize_t>(m.num_rows_) - 1);
 
     if (is_dynamic_string_type(m.dest_type_desc_.data_type())) {
@@ -240,7 +240,7 @@ void PythonArrayHandler::handle_type(
     Column column{m.source_type_desc_, Sparsity::PERMITTED};
     data += decode_field(m.source_type_desc_, field, data, column, column.opt_sparse_map(), encoding_version);
     // Calling `set_row_data` should be done after `sparse_map` is modified by `decode_field`.
-    // TODO: Refactor so that `last_logical_row` is inferred from sparse_map as described in #2932
+    // CHRIS-70: Refactor so that `last_logical_row` is inferred from sparse_map (upstream #2932)
     column.set_row_data(static_cast<ssize_t>(m.num_rows_) - 1);
 
     convert_type(column, dest_column, m, shared_data, any, string_pool, read_options);
@@ -272,7 +272,7 @@ void PythonArrayHandler::convert_type(
     const arcticdb::DecodePathData&,
     std::any& any,
     const std::shared_ptr<StringPool>&,
-    const ReadOptions&) const { //TODO we don't handle string arrays at the moment
+    const ReadOptions&) const { // CHRIS-72: string arrays not yet handled
     auto* ptr_dest =
             dest_column.ptr_cast<PyObject*>(mapping.offset_bytes_ / type_size(), mapping.num_rows_ * type_size());
     ARCTICDB_SUBSAMPLE(InitArrayAcquireGIL, 0)

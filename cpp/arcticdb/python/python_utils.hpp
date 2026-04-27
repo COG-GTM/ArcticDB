@@ -41,10 +41,10 @@ class ARCTICDB_VISIBILITY_HIDDEN PyRowRef : public py::tuple {
                                   T::DataTypeTag::data_type == DataType::ASCII_FIXED64) {
                         set_col(col, segment.string_at(row_pos, col).value());
                     } else {
-                        set_col(col, segment.scalar_at<RawType>(row_pos, col).value()); // TODO handle sparse
+                        set_col(col, segment.scalar_at<RawType>(row_pos, col).value()); // CHRIS-71: handle sparse
                     }
                 } else {
-                    // TODO handle utf too
+                    // CHRIS-72: handle UTF strings too
                     if (T::DataTypeTag::data_type == DataType::ASCII_FIXED64) {
                         auto str_arr = segment.string_array_at(row_pos, col).value();
                         set_col(col, py::array(from_string_array(str_arr)));
@@ -161,7 +161,7 @@ inline bool from_pd_timestamp(const py::object& o, timestamp& ts) {
         ts = o.attr("value").cast<timestamp>();
         return true;
     }
-    // TODO manage absence of pandas
+    // CHRIS-72: handle absence of pandas gracefully
     return false;
 }
 
@@ -199,7 +199,7 @@ inline bool from_dt64(const py::object& o, timestamp& ts) {
         // i.e. Pandas >= 2.0 will also provides `datetime64[us]`, `datetime64[ms]` and `datetime64[s]`.
         // See:
         // https://pandas.pydata.org/docs/dev/whatsnew/v2.0.0.html#construction-with-datetime64-or-timedelta64-dtype-with-unsupported-resolution
-        // TODO: for the support of Pandas>=2.0, convert any `datetime` to `datetime64[ns]` before-hand and do not
+        // CHRIS-73: for Pandas>=2.0 support, convert any `datetime` to `datetime64[ns]` before-hand and do not
         // rely uniquely on the resolution-less 'M' specifier if it this doable.
         ts = o.attr("astype")("datetime64[ns]").attr("astype")("uint64").cast<timestamp>();
         return true;

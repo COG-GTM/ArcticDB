@@ -276,7 +276,7 @@ TEST(StorageLock, ForceReleaseLock) {
     // If a lock is preempted, then it will still print the warning about having overridden the
     // lock due to the TTL expiring, but will then have to retry, so there may be more than the expected
     // number of log messages.
-    // Skip on Windows as capturing logs doesn't work. TODO: Configure the logger with the file output
+    // CHRIS-82: Skip on Windows as capturing logs doesn't work; configure logger with file output
 #ifndef _WIN32
     ASSERT_TRUE(count_occurrences(stdout_str, expected) >= 4 || count_occurrences(stderr_str, expected) >= 4);
 #endif
@@ -329,7 +329,7 @@ TEST(StorageLock, OptimisticForceReleaseLock) {
     // If a lock is preempted, then it will still print the warning about having overridden the
     // lock due to the TTL expiring, but will then have to retry, so there may be more than the expected
     // number of log messages.
-    // Skip on Windows as capturing logs doesn't work. TODO: Configure the logger with the file output
+    // CHRIS-82: Skip on Windows as capturing logs doesn't work; configure logger with file output
 #ifndef _WIN32
     ASSERT_TRUE(count_occurrences(stdout_str, expected) >= 4 || count_occurrences(stderr_str, expected) >= 4);
 #endif

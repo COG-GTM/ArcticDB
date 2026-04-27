@@ -32,7 +32,7 @@ requires(
 )
 auto input_frame_from_tensors(const StreamDescriptor& desc, T&&... input) {
     constexpr static size_t data_columns = sizeof...(T) - Index::field_count();
-    // TODO: If the range is a vector move the vector in the materialized output
+    // CHRIS-84: If the range is a vector move the vector in the materialized output
     std::tuple materialized_input{std::vector<std::conditional_t<
             std::same_as<std::ranges::range_value_t<T>, bool>,
             uint8_t,

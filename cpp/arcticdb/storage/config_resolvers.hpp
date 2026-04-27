@@ -17,7 +17,7 @@ class ConfigResolver {
   public:
     virtual ~ConfigResolver() = default;
 
-    // TODO nothing especially wrong with this method but what's the expected use case?
+    // CHRIS-78: Decide on list_environments() use case and either implement or remove
     // virtual std::vector<EnvironmentName> list_environments() const = 0;
     virtual std::vector<std::pair<LibraryPath, arcticdb::proto::storage::LibraryDescriptor>> get_libraries(
             const EnvironmentName& environment_name

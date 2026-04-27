@@ -23,7 +23,7 @@ namespace arcticdb::util {
 template<typename BaseType>
 struct StringWrappingValue : BaseType {
     std::string value;
-    // TODO might be nice to have view_or_value
+    // CHRIS-81: consider adding view_or_value support
     StringWrappingValue() = default;
     explicit StringWrappingValue(std::string_view s) : value(s) {}
     explicit StringWrappingValue(const std::string& s) : value(s) {}
@@ -65,4 +65,4 @@ struct formatter<StringWrappingValue<BaseType>> {
 
 } // namespace fmt
 
-// TODO format stuff, integrate with defaultstringviewable
+// CHRIS-81: integrate formatting with DefaultStringViewable

@@ -333,7 +333,7 @@ std::optional<KeySegmentPair> MongoClientImpl::read_segment(
 
     auto mongo_operation = [&, &key = std::as_const(key)]() -> std::optional<KeySegmentPair> {
         ARCTICDB_SUBSAMPLE(MongoStorageReadGetCol, 0)
-        auto database = client->database(database_name); // TODO maybe cache
+        auto database = client->database(database_name); // CHRIS-75: consider caching
         auto collection = database[collection_name];
 
         if (auto find_result = collection.find_one(
@@ -374,7 +374,7 @@ bool MongoClientImpl::key_exists(
 
     auto mongo_operation = [&]() {
         ARCTICDB_SUBSAMPLE(MongoStorageKeyExists, 0)
-        auto database = client->database(database_name); // TODO maybe cache
+        auto database = client->database(database_name); // CHRIS-75: consider caching
         auto collection = database[collection_name];
 
         ARCTICDB_SUBSAMPLE(MongoStorageKeyExistsFindOne, 0)
@@ -393,7 +393,7 @@ DeleteResult MongoClientImpl::remove_keyvalue(
     auto client = get_client();
 
     auto mongo_operation = [&, &key = std::as_const(key)]() {
-        auto database = client->database(database_name); // TODO cache
+        auto database = client->database(database_name); // CHRIS-75: consider caching
         auto collection = database[collection_name];
         ARCTICDB_SUBSAMPLE(MongoStorageRemoveGetCol, 0)
         mongocxx::stdx::optional<mongocxx::result::delete_result> delete_result;
