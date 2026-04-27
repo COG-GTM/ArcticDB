@@ -53,8 +53,6 @@ def apply_dynamic_schema_changes(to_df: pd.DataFrame, from_df: pd.DataFrame):
         cols_to_df = set(to_df.columns)
         for col in from_df.columns:
             if col in cols_to_df:
-                # TODO: Can do schema checks here if we want friendly error messages.
-                # Not strictly needed as pandas.concat will raise errors if types are incompatible
                 continue
             dtype = from_df[col].dtype
             to_df[col] = empty_column_of_type(len(to_df), dtype)
@@ -154,7 +152,6 @@ class ArcticSymbolSimulator:
 
             result_df = pd.concat([df1, df2])
             if isinstance(df1.index, pd.RangeIndex):
-                # TODO: Can abstract index fixing to a common function
                 result_df = result_df.reset_index(drop=True)
             return result_df
 

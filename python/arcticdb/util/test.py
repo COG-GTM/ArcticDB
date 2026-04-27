@@ -757,7 +757,6 @@ def regularize_dataframe(df):
     for col in output.select_dtypes(include=["object"]).columns:
         output[col] = output[col].fillna("")
 
-    # TODO remove this when filtering code returns NaN
     output.fillna(0, inplace=True)
     output = output.reindex(sorted(output.columns), axis=1)
     output = output.reset_index(drop=True)
@@ -890,7 +889,6 @@ def generic_filter_test_strings_dynamic(lib, base_symbol, slices, arctic_query, 
         generic_filter_test_dynamic(lib, symbol, arctic_query, queried_slices)
 
 
-# TODO: Replace with np.array_equal with equal_nan argument (added in 1.19.0)
 def generic_filter_test_nans(lib, symbol, arctic_query, expected, output_format=OutputFormat.PANDAS):
     query_processing_functions = get_query_processing_functions(lib, symbol, arctic_query)
     for proccessing_function in query_processing_functions:
@@ -1574,8 +1572,7 @@ def merge(
         MergeStrategy(matched="update", not_matched_by_target="do_nothing")
     ):
         return merge_update(target, source, on)
-    # TODO: Implement other merge strategies
-    raise Exception(f"Merge strategy {strategy} not implemented")
+    raise NotImplementedError(f"Merge strategy {strategy} not implemented")
 
 
 def query_stats_operation_count(stats, operation, key_type):

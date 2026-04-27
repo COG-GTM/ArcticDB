@@ -96,7 +96,6 @@ class Flattener:
         return None if obj_type == type(None) else "class", obj_type.__module__, obj_type.__name__
 
     def derive_iterables(self, obj):
-        # TODO: maybe move out the normalizer related bits.
         normalizer = None
         if self.is_normalizable_to_nested_structure(obj):
             normalizer_type = self.get_normalizer_for_item(obj)
@@ -124,7 +123,7 @@ class Flattener:
     @staticmethod
     def try_serialize_as_primitive(obj):
         try:
-            return msgpack.packb(obj, use_bin_type=True, strict_types=True)  # TODO: use msgpacknormalizer
+            return msgpack.packb(obj, use_bin_type=True, strict_types=True)
         except TypeError:
             return None
 
@@ -252,7 +251,7 @@ class Flattener:
         try:
             module = sys.modules[type_module]
             return getattr(module, type_name)
-        except Exception as e:
+        except (KeyError, AttributeError) as e:
             raise RuntimeError(f"{type_module}::{type_name} defined in meta structure cannot be loaded: {e}")
 
     def _deserialize_leaf_node(self, meta_struct, key_map):

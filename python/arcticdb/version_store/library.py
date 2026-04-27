@@ -3253,6 +3253,8 @@ class Library:
 
     def is_symbol_fragmented(self, symbol: str, segment_size: Optional[int] = None) -> bool:
         """
+        Deprecated: Use :py:meth:`compact_data_experimental` instead.
+
         Check whether the number of segments that would be reduced by compaction is more than or equal to the
         value specified by the configuration option "SymbolDataCompact.SegmentCount" (defaults to 100).
 
@@ -3282,6 +3284,8 @@ class Library:
         prune_previous_versions: bool = False,
     ) -> VersionedItem:
         """
+        Deprecated: Use :py:meth:`compact_data_experimental` instead.
+
         Compacts fragmented segments by merging row-sliced segments (https://docs.arcticdb.io/technical/on_disk_storage/#data-layer).
         This method calls `is_symbol_fragmented` to determine whether to proceed with the defragmentation operation.
 
