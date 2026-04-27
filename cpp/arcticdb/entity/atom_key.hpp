@@ -126,7 +126,7 @@ class AtomKeyImpl {
     KeyType key_type_ = KeyType::UNDEFINED;
     IndexValue index_start_;
     IndexValue index_end_;
-    mutable std::string str_; // TODO internalized string
+    mutable std::string str_; // PERF: Consider interning strings to reduce allocations
     mutable std::optional<size_t> hash_;
 
     void reset_cached() {

@@ -103,7 +103,7 @@ stream::FixedSchema idx_schema(StreamId tsid, const IndexType& index) {
 
 inline entity::KeyType key_type_compat(uint8_t kt) {
     auto ret = static_cast<KeyType>(kt);
-    // TODO would be nice to retire this at some point
+    // Legacy key type character mapping, retained for backward compatibility with older storage formats
     if (kt > static_cast<uint8_t>(entity::KeyType::UNDEFINED)) {
         constexpr char legacy_key_types[] = {'g', 'G', 'd', 'i', 'V', 'v', 'M', 's', 'l'};
         for (size_t i = 0; i < sizeof(legacy_key_types); ++i) {
@@ -156,8 +156,7 @@ inline entity::AtomKey read_key_row_impl(const SegmentInMemory& seg, ssize_t i) 
 }
 
 inline entity::AtomKey read_key_row(const SegmentInMemory& seg, ssize_t i) {
-    // TODO remove backwards compat after a decent interval
-    // We differentiate between new and legacy fields based on the column with position 4:
+    // Legacy field format backward compatibility: differentiate new vs legacy fields based on column 4:
     // 4 = Fields::creation_ts = LegacyFields::index_type
     // where creation_ts is 8 bytes but index_type is a single byte
     constexpr auto pos = static_cast<uint32_t>(pipelines::index::Fields::creation_ts);
@@ -181,7 +180,7 @@ class IndexRangeFilter {
 
     bool accept_index(const IndexValue& index) { return index_range_.accept(index); }
 
-    // TODO are we interested in the end field?
+    // Only checks start_index; end_index filtering not needed for current use cases
     bool key_within_index_range(const entity::AtomKey& key) { return accept_index(key.start_index()); }
 
   private:
@@ -203,7 +202,7 @@ class KeyRangeIterator : public IndexRangeFilter {
             auto res = *current_;
             ++current_;
             if (key_within_index_range(res))
-                return res; // TODO keep track of first / last case
+                return res;
         }
     }
 

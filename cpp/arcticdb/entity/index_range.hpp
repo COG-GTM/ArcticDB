@@ -78,9 +78,8 @@ struct IndexRange {
     // as this should never happen
     bool accept(const IndexValue& index);
 
-    // TODO: So many of these functions don't verify they are using the expected values of `start_inclusive` or
-    // `end_inclusive`. We should fix them and make `start_` and `end_` private and make them only accessible through
-    // functions like `inclusive_end()`.
+    // Several range functions do not verify start_closed_/end_closed_; start_ and end_ should be made private,
+    // accessible only through inclusive_start()/inclusive_end() to enforce correctness.
 
     // N.B. Convenience function, variant construction will be too expensive for tight loops
     friend bool intersects(const IndexRange& left, const IndexRange& right) {

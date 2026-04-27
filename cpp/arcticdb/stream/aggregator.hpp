@@ -126,9 +126,7 @@ class ListOfSegmentPolicies {
     }
 
     [[nodiscard]] size_t expected_row_size() const {
-        size_t val = 0;
-        // TODO: Do it differently later, currently just using 0 since that's what we need for tickdata
-        return val;
+        return 0;
     }
 
   private:
@@ -195,7 +193,7 @@ class Aggregator {
     }
 
     void rollback_row(util::BitSet&) noexcept {
-        // TODO implement rollback
+        // Segment-level rollback not yet implemented
     }
 
     virtual void commit();

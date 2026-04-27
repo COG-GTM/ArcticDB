@@ -148,8 +148,7 @@ folly::Future<folly::Unit> LocalVersionedEngine::delete_unreferenced_pruned_inde
 ) {
     try {
         if (!pruned_indexes.empty() && !cfg().write_options().delayed_deletes()) {
-            // TODO: the following function will load all snapshots, which will be horrifyingly inefficient when called
-            // multiple times from batch_*
+            // PERF: loads all snapshots; inefficient when called repeatedly from batch_* operations
             auto [not_in_snaps, in_snaps] = get_index_keys_partitioned_by_inclusion_in_snapshots(
                     store(), pruned_indexes.begin()->id(), std::move(pruned_indexes)
             );
@@ -894,7 +893,7 @@ VersionedItem LocalVersionedEngine::write_segment(
     }
     auto partial_key = IndexPartialKey(stream_id, version_id);
 
-    // TODO: do the segment splitting in parallel
+    // PERF: segment splitting could be parallelized
     std::vector<SegmentInMemory> slices;
     switch (slicing) {
     case Slicing::NoSlicing:

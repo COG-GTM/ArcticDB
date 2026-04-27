@@ -17,7 +17,7 @@
 
 #include <folly/synchronization/NativeSemaphore.h>
 #include <folly/futures/Future.h>
-// FIXME: winnt.h is included by folly/futures/Future.h at some point and adds unwanted macros
+// winnt.h included via folly/futures/Future.h defines conflicting macros that must be undefined
 #ifdef DELETE
 #undef DELETE
 #endif

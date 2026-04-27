@@ -2855,8 +2855,8 @@ std::shared_ptr<PipelineContext> setup_pipeline_context(
                 pipeline_context->stream_id_ = preloaded_index_query->index_key_.id();
                 // The PreloadedIndexQuery should be reusable if collect() is called multiple times on the same lazy
                 // dataframe, hence the clone
-                auto missing_stats_seg = std::nullopt; // TODO aseaton support column stats with preloaded index reads,
-                                                       // for Polars plugin Monday: 11526152128
+                // Column stats not yet supported with preloaded index reads (Monday: 11526152128)
+                auto missing_stats_seg = std::nullopt;
                 IndexInformation cloned_index{
                         {preloaded_index_query->index_key_, preloaded_index_query->index_seg_.clone()},
                         missing_stats_seg
@@ -3084,7 +3084,7 @@ folly::Future<VersionedItem> merge_update_impl(
     }
     std::shared_ptr<PipelineContext> pipeline_context =
             setup_pipeline_context(store, std::move(resolved), *read_query, read_options);
-    // TODO: Rely on modify_schema for this https://man312219.monday.com/boards/7852509418/pulses/10997979275
+    // Schema mismatch check; modify_schema support tracked in Monday: 10997979275
     schema::check<ErrorCode::E_DESCRIPTOR_MISMATCH>(
             columns_match(pipeline_context->descriptor(), source_descriptor),
             "Cannot perform merge update when the source and target schema are not the same.\nSource schema: "
@@ -3111,8 +3111,8 @@ folly::Future<VersionedItem> merge_update_impl(
                         write_options,
                         source = std::move(source),
                         target_partial_index_key](std::vector<SliceAndKey>&& data_keys_and_slices) {
-                // TODO: This needs to be changed to account for the INSERT option of merge update. Insert can
-                // create new segments and shift row slices.
+                // Does not yet account for the INSERT option of merge update, which can create new
+                // segments and shift row slices.
                 ranges::sort(data_keys_and_slices);
                 std::vector<SliceAndKey> merged_ranges_and_keys;
                 auto new_slice = data_keys_and_slices.begin();
