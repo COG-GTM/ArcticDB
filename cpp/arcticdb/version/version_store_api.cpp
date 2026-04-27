@@ -701,6 +701,7 @@ VersionedItem PythonVersionStore::write_partitioned_dataframe(
 
     multi_index_agg.commit();
     return {to_atom(std::move(multi_key_fut).get())};
+    // Partition multi-key is not yet stored in the version key for this symbol
 }
 
 VersionedItem PythonVersionStore::write_versioned_composite_data(

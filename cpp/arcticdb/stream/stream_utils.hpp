@@ -202,7 +202,7 @@ class KeyRangeIterator : public IndexRangeFilter {
             auto res = *current_;
             ++current_;
             if (key_within_index_range(res))
-                return res;
+                return res; // Does not track first/last key returned during iteration
         }
     }
 

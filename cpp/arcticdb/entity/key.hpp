@@ -246,6 +246,7 @@ enum class VariantType : char { STRING_TYPE = 's', NUMERIC_TYPE = 'd', UNKNOWN_T
 VariantType variant_type_from_key_type(KeyType key_type);
 
 constexpr bool is_index_key_type(KeyType key_type) {
+    // Name is potentially misleading: also matches MULTI_KEY which is not strictly an index type
     return (key_type == KeyType::TABLE_INDEX) || (key_type == KeyType::MULTI_KEY);
 }
 
