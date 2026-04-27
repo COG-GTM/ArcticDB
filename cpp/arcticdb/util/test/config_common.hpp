@@ -17,7 +17,7 @@ namespace arcticdb {
 
 inline auto get_test_lmdb_config() {
     arcticdb::proto::lmdb_storage::Config cfg;
-    cfg.set_path("./"); // TODO local path is a bit annoying. TMPDIR?
+    cfg.set_path("./"); // CHRIS-82: consider using TMPDIR
     cfg.set_recreate_if_exists(true);
     return cfg;
 }

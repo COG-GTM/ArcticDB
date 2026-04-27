@@ -50,7 +50,7 @@ S3Result<std::monostate> S3ClientImpl::head_object(const std::string& s3_object_
     return {std::monostate()};
 }
 
-// TODO Use buffer pool once memory profile and lifetime is well understood
+// CHRIS-79: Use buffer pool once memory profile and lifetime is well understood
 struct S3StreamBuffer : public std::streambuf {
     ARCTICDB_NO_MOVE_OR_COPY(S3StreamBuffer)
 

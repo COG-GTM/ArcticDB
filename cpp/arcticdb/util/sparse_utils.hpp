@@ -43,7 +43,16 @@ void densify_buffer_using_bitmap(
     size_t pos_in_dense_buffer = 0;
     while (en < en_end) {
         auto dense_index_in_bitset = *en;
-        // TODO: add asserts
+        ARCTICDB_DEBUG(
+                log::version(), "densify: pos_in_dense={}, bitset_index={}", pos_in_dense_buffer, dense_index_in_bitset
+        );
+        util::check(
+                (pos_in_dense_buffer + 1) * element_size <= dense_buffer.bytes(),
+                "Dense buffer write out of bounds: pos={}, element_size={}, buffer_bytes={}",
+                pos_in_dense_buffer,
+                element_size,
+                dense_buffer.bytes()
+        );
         auto copy_to = dense_ptr + pos_in_dense_buffer * element_size;
         auto copy_from = sparse_ptr + dense_index_in_bitset * element_size;
         ARCTICDB_TRACE(

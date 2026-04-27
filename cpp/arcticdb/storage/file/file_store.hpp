@@ -122,7 +122,7 @@ void write_dataframe_to_file_internal(
                                 store
                         );
                     });
-    // TODO include key size and key offset in max size calculation
+    // CHRIS-78: include key size and key offset in max size calculation
     auto index_key = std::move(index_fut).get();
     auto serialized_key = to_serialized_key(index_key);
     auto single_file_store = library->get_single_file_storage().value();

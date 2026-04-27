@@ -14,7 +14,7 @@
 
 #include <pybind11/numpy.h>
 
-// TODO this class is bogus and not part of the long-term plan. If it's only used for
+// CHRIS-74: this class is not part of the long-term plan. If it's only used for
 //  testing and the toolbox then move it, otherwise get rid of it
 
 namespace py = pybind11;
@@ -58,7 +58,7 @@ class TickReader {
                         auto str = segment_.string_at(row, col).value();
                         res.append(str);
                     } else {
-                        RawType v = segment_.scalar_at<RawType>(row, col).value(); // TODO handle sparse
+                        RawType v = segment_.scalar_at<RawType>(row, col).value(); // CHRIS-71: handle sparse
                         res.append(v);
                     }
                 } else {

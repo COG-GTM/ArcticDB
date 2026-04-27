@@ -60,7 +60,7 @@ using namespace Azure::Storage;
 using namespace Azure::Storage::Blobs;
 
 Azure::Core::Context get_context(unsigned int request_timeout) {
-    Azure::Core::Context requestContext; // TODO: Maybe can be static but need to be careful with its shared_ptr and
+    Azure::Core::Context requestContext; // CHRIS-77: Maybe can be static but need to be careful with shared_ptr and
                                          // ContextSharedState
     return requestContext.WithDeadline(std::chrono::system_clock::now() + std::chrono::milliseconds(request_timeout));
 }

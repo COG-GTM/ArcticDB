@@ -629,7 +629,7 @@ void add_bitmagic_compressed_size(
 /// will not improve anything and in fact it might worsen the encoding.
 [[nodiscard]] static size_t encode_bitmap(const util::BitMagic& sparse_map, Buffer& out, std::ptrdiff_t& pos) {
     ARCTICDB_DEBUG(log::version(), "Encoding sparse map of count: {}", sparse_map.count());
-    bm::serializer<bm::bvector<>> bvs; // TODO: It is inefficient to create the serializer every time.
+    bm::serializer<bm::bvector<>> bvs; // CHRIS-83: inefficient to create the serializer every time
     bm::bvector<>::statistics st;
     sparse_map.calc_stat(&st);
     auto total_max_size = st.max_serialize_mem + util::combined_bit_magic_delimiters_size();

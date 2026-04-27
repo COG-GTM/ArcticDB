@@ -24,7 +24,7 @@ namespace arcticdb {
 enum class FailureType : int {
     WRITE = 0,
     READ,
-    WRITE_LOCK, // TODO: Remove this when refactoring StorageFailureSimulator
+    WRITE_LOCK, // CHRIS-76: Remove when refactoring StorageFailureSimulator
     ITERATE,
     DELETE,
 };
@@ -32,7 +32,7 @@ enum class FailureType : int {
 static const char* failure_names[] = {
         "WRITE",
         "READ",
-        "WRITE_LOCK", // TODO: Remove this when refactoring StorageFailureSimulator
+        "WRITE_LOCK", // CHRIS-76: Remove when refactoring StorageFailureSimulator
         "ITERATE",
         "DELETE",
 };

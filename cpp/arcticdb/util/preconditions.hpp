@@ -160,7 +160,7 @@ template<ErrorCode code>
 constexpr auto raise = check<code>.raise;
 } // namespace codec
 
-// TODO Change legacy codes to internal::
+// CHRIS-80: Change legacy codes to internal::
 namespace util {
 
 constexpr auto check = util::detail::Check<ErrorCode::E_ASSERTION_FAILURE, ErrorCategory::INTERNAL>{};
@@ -174,10 +174,10 @@ void check_range(size_t idx, size_t size, const char* msg) {
 
 constexpr auto check_arg = util::detail::Check<ErrorCode::E_INVALID_ARGUMENT, ErrorCategory::INTERNAL>{};
 
-// TODO Replace occurrences with specific error code
+// CHRIS-80: Replace occurrences with specific error code
 constexpr auto check_rte = util::detail::Check<ErrorCode::E_RUNTIME_ERROR, ErrorCategory::INTERNAL>{};
 
-// TODO Replace occurrences with specific error code
+// CHRIS-80: Replace occurrences with specific error code
 constexpr auto raise_rte = check.raise;
 
 template<typename... Args>

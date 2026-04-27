@@ -50,7 +50,7 @@ void copy_packed_bits(const uint8_t* src, size_t src_bit_offset, size_t num_bits
 template<typename functor>
 requires std::is_invocable_r_v<void, functor, size_t>
 void iterate_over_set_positions(const bm::bvector<>& bv, size_t from, size_t to, functor&& f) {
-    // TODO: Investigate performance of `get_enumerator`. Maybe having an rs_index can speed it up.
+    // CHRIS-83: Investigate performance of `get_enumerator`. Maybe having an rs_index can speed it up.
     for (auto en = bv.get_enumerator(from); *en < to; ++en) {
         f(*en);
     }

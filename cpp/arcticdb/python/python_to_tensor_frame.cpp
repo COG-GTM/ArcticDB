@@ -262,7 +262,7 @@ void tensors_to_frame(const py::tuple& tuple, const bool empty_types, InputFrame
         util::check(index_tensor.shape() != nullptr, "Index tensor expected to contain shapes");
         std::string index_column_name = !idx_names.empty() ? idx_names[0] : "index";
         frame.num_rows = static_cast<size_t>(index_tensor.shape(0));
-        // TODO handle string indexes
+        // CHRIS-72: handle string indexes
         if (index_tensor.data_type() == DataType::NANOSECONDS_UTC64) {
             desc.set_index_field_count(1);
             desc.set_index_type(IndexDescriptor::Type::TIMESTAMP);
