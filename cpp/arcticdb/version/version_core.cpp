@@ -56,7 +56,8 @@ static void modify_descriptor(
         const std::shared_ptr<pipelines::PipelineContext>& pipeline_context, const ReadOptions& read_options
 ) {
 
-    if ((read_options.force_strings_to_object() && *read_options.force_strings_to_object()) || (read_options.force_strings_to_fixed() && *read_options.force_strings_to_fixed()))
+    if ((read_options.force_strings_to_object() && *read_options.force_strings_to_object()) ||
+        (read_options.force_strings_to_fixed() && *read_options.force_strings_to_fixed()))
         pipeline_context->orig_desc_ = pipeline_context->desc_;
 
     auto& desc = *pipeline_context->desc_;
@@ -2881,7 +2882,8 @@ std::shared_ptr<PipelineContext> setup_pipeline_context(
         const auto existing_range = pipeline_context->index_range();
         if (!existing_range.specified_ || query_range.end_ > existing_range.end_) {
             const ReadIncompletesFlags read_incompletes_flags{
-                    .dynamic_schema = read_options.dynamic_schema() && *read_options.dynamic_schema(), .has_active_version = has_active_version
+                    .dynamic_schema = read_options.dynamic_schema() && *read_options.dynamic_schema(),
+                    .has_active_version = has_active_version
             };
             read_incompletes_to_pipeline(
                     store, pipeline_context, std::nullopt, read_query, read_options, read_incompletes_flags
