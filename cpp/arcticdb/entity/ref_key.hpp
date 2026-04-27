@@ -47,7 +47,7 @@ class RefKey {
 
     friend bool operator!=(const RefKey& l, const RefKey& r) { return !(l == r); }
 
-    // Sorts by id only, consistent with AtomKeyImpl::operator<
+    // Sorts by id only; neither RefKey nor AtomKeyImpl includes key type in ordering
     friend bool operator<(const RefKey& l, const RefKey& r) { return l.id() < r.id(); }
 
     std::string_view view() const {
