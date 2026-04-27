@@ -166,6 +166,7 @@ class LibraryOptions:
         )
 
 
+# TODO: Use enum.StrEnum when we no longer need to support python 3.9
 class OutputFormat(str, Enum):
     """
     Controls the output format of operations which return dataframes. All APIs which take an `output_format` argument

@@ -847,6 +847,9 @@ class NativeVersionStore:
             "recursive_normalize_msgpack_no_pickle_fallback", None
         )
 
+        if parallel:
+            dynamic_strings = True
+
         coerce_columns = kwargs.get("coerce_columns", None)
         sparsify_floats = kwargs.get("sparsify_floats", False)
         norm_failure_options_msg = kwargs.get("norm_failure_options_msg", self.norm_failure_options_msg_write)
