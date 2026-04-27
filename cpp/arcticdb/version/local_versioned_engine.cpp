@@ -11,7 +11,6 @@
 #include <arcticdb/version/version_core.hpp>
 #include <arcticdb/storage/storage.hpp>
 #include <arcticdb/storage/storage_options.hpp>
-#include <arcticdb/util/optional_defaults.hpp>
 #include <arcticdb/version/snapshot.hpp>
 #include <arcticdb/stream/stream_sink.hpp>
 #include <arcticdb/util/preconditions.hpp>
@@ -414,7 +413,7 @@ VersionIdentifier get_version_identifier(
         const std::optional<VersionedItem>& version
 ) {
     if (!version) {
-        if (opt_false(read_options.incompletes())) {
+        if (read_options.incompletes() && *read_options.incompletes()) {
             log::version().warn("No index: Key not found for {}, will attempt to use incomplete segments.", stream_id);
             return stream_id;
         } else {

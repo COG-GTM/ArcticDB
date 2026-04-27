@@ -402,7 +402,6 @@ set(arcticdb_srcs
         util/name_validation.hpp
         util/native_handler.hpp
         util/offset_string.hpp
-        util/optional_defaults.hpp
         util/pb_util.hpp
         util/preconditions.hpp
         util/preprocess.hpp

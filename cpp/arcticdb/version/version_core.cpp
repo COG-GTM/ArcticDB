@@ -56,11 +56,11 @@ static void modify_descriptor(
         const std::shared_ptr<pipelines::PipelineContext>& pipeline_context, const ReadOptions& read_options
 ) {
 
-    if (opt_false(read_options.force_strings_to_object()) || opt_false(read_options.force_strings_to_fixed()))
+    if ((read_options.force_strings_to_object() && *read_options.force_strings_to_object()) || (read_options.force_strings_to_fixed() && *read_options.force_strings_to_fixed()))
         pipeline_context->orig_desc_ = pipeline_context->desc_;
 
     auto& desc = *pipeline_context->desc_;
-    if (opt_false(read_options.force_strings_to_object())) {
+    if (read_options.force_strings_to_object() && *read_options.force_strings_to_object()) {
         auto& fields = desc.fields();
         for (Field& field_desc : fields) {
             if (field_desc.type().data_type() == DataType::ASCII_FIXED64)
@@ -69,7 +69,7 @@ static void modify_descriptor(
             if (field_desc.type().data_type() == DataType::UTF_FIXED64)
                 set_data_type(DataType::UTF_DYNAMIC64, field_desc.mutable_type());
         }
-    } else if (opt_false(read_options.force_strings_to_fixed())) {
+    } else if (read_options.force_strings_to_fixed() && *read_options.force_strings_to_fixed()) {
         auto& fields = desc.fields();
         for (Field& field_desc : fields) {
             if (field_desc.type().data_type() == DataType::ASCII_DYNAMIC64)
@@ -1169,7 +1169,7 @@ folly::Future<std::vector<EntityId>> read_and_schedule_processing(
         std::shared_ptr<ComponentManager> component_manager
 ) {
     const ProcessingConfig processing_config{
-            opt_false(read_options.dynamic_schema()),
+            read_options.dynamic_schema() && *read_options.dynamic_schema(),
             pipeline_context->rows_,
             pipeline_context->descriptor().index().type()
     };
@@ -1356,7 +1356,7 @@ static void read_indexed_keys_to_pipeline(
     const bool bucketize_dynamic = index_segment_reader.bucketize_dynamic();
     pipeline_context->desc_ = tsd.as_stream_descriptor();
 
-    const bool dynamic_schema = opt_false(read_options.dynamic_schema());
+    const bool dynamic_schema = read_options.dynamic_schema() && *read_options.dynamic_schema();
     auto queries = get_column_bitset_and_query_functions<index::IndexSegmentReader>(
             read_query, pipeline_context, dynamic_schema, bucketize_dynamic
     );
@@ -2881,7 +2881,7 @@ std::shared_ptr<PipelineContext> setup_pipeline_context(
         const auto existing_range = pipeline_context->index_range();
         if (!existing_range.specified_ || query_range.end_ > existing_range.end_) {
             const ReadIncompletesFlags read_incompletes_flags{
-                    .dynamic_schema = opt_false(read_options.dynamic_schema()), .has_active_version = has_active_version
+                    .dynamic_schema = read_options.dynamic_schema() && *read_options.dynamic_schema(), .has_active_version = has_active_version
             };
             read_incompletes_to_pipeline(
                     store, pipeline_context, std::nullopt, read_query, read_options, read_incompletes_flags
