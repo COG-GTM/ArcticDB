@@ -639,7 +639,7 @@ class Column {
                         }
                         return first;
                     } else {
-                        // TODO: Could relax this requirement using something like has_valid_common_type
+                        // OPTIM: Could relax this requirement using has_valid_common_type for cross-type search.
                         internal::raise<ErrorCode::E_ASSERTION_FAILURE>(
                                 "Column::search_sorted requires input value to be of same type as column"
                         );
