@@ -61,9 +61,8 @@ StatsComparison stats_membership_comparator(const ColumnStatsValues& stats, Valu
         return details::visit_type(set_min->data_type(), [&](auto set_tag) -> StatsComparison {
             using SetTag = std::remove_reference_t<decltype(set_tag)>;
 
-            // TODO add bool support once the bool PR is merged
-            // Monday: 8065794446 we should disallow comparing time types to non-time numeric types
-            // This is also wrong downstream in the rest of the processing pipeline
+            // OPTIM: Add bool type support for column stats comparison (Monday: 8065794446).
+            // Also: disallow comparing time types to non-time numeric types here and downstream.
             if constexpr ((is_numeric_type(StatsTag::data_type) || is_time_type(StatsTag::data_type)) &&
                           (is_numeric_type(SetTag::data_type) || is_time_type(SetTag::data_type))) {
                 using StatsRawType = StatsTag::raw_type;
@@ -176,12 +175,9 @@ StatsComparison binary_boolean_stats(StatsComparison left, StatsComparison right
 std::vector<StatsComparison> visit_binary_boolean_stats(
         const StatsVariantData& left, const StatsVariantData& right, OperationType operation
 ) {
-    // TODO aseaton remaining cases Monday: 11292565671
-    // StatsComparison & Value -> Only if Value is a bool
-    // StatsComparison & ColumnStatsValues -> Only if ColumnStatsValues are a bool
-    // Value & Value -> Only if Value is a bool
-    // ColumnStatsValues & ColumnStatsValues -> Only if a bool
-    // Value & ColumnStatsValues -> Only if a bool
+    // OPTIM: Remaining cases (Monday: 11292565671):
+    // StatsComparison & Value, StatsComparison & ColumnStatsValues, Value & Value,
+    // ColumnStatsValues & ColumnStatsValues, Value & ColumnStatsValues — all only if bool.
     return std::visit(
             util::overload{
                     [operation](const std::vector<StatsComparison>& l, const std::vector<StatsComparison>& r)

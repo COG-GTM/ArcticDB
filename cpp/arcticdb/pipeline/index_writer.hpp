@@ -18,7 +18,7 @@
 #include <arcticdb/pipeline/pipeline_common.hpp>
 
 namespace arcticdb::pipelines::index {
-// TODO: change the name - something like KeysSegmentWriter or KeyAggragator or  better
+// OPTIM: Consider renaming to KeysSegmentWriter or KeyAggregator for clarity.
 template<ValidIndex Index>
 class IndexWriter {
     // All index segments are row-count indexed in the sense that the keys are

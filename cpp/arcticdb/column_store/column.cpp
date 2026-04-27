@@ -722,7 +722,7 @@ size_t Column::get_physical_offset(size_t row) const {
     if (row == 0u)
         return 0u;
 
-    // TODO: cache index
+    // OPTIM: Cache rs_index to avoid rebuilding on every call.
     auto rs = std::make_unique<bm::bvector<>::rs_index_type>();
     sparse_map().build_rs_index(rs.get());
     return sparse_map().count_to(bv_size(row - 1), *rs);
@@ -846,7 +846,7 @@ void Column::change_type(DataType target_type) {
 
 position_t Column::row_count() const {
     if (!is_scalar()) {
-        // TODO check with strings as well
+        // FIXME: Verify this logic works correctly for string types as well.
         return num_shapes() / shape_t(type_.dimension());
     }
 
@@ -857,7 +857,7 @@ position_t Column::row_count() const {
 }
 
 std::vector<std::shared_ptr<Column>> Column::split(const std::shared_ptr<Column>& column, size_t rows) {
-    // TODO: Doesn't work the way you would expect for sparse columns - the bytes for each buffer won't be uniform
+    // FIXME: Sparse columns are not handled correctly — physical bytes per buffer won't be uniform.
     const auto bytes = rows * get_type_size(column->type().data_type());
     auto new_buffers = ::arcticdb::split(column->data_.buffer(), bytes);
     util::check(

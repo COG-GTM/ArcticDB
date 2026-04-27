@@ -63,13 +63,9 @@ static void for_each_enumerated_flattened(
         std::optional<size_t> end_idx = std::nullopt
 ) {
     auto input_data = input_column.data();
-    // When `start_idx` or `end_idx` are set we use `std::advance` to get the `begin` and `end` iterators to the correct
-    // locations. This is inefficient because `ColumnDataIterator` is not random access
-    // TODO: Prove a random access `ColumnData::iterator_at(position)`.
-    // Alternatively we could make `ColumnDataIterator` random access but this can be tricky because random access in a
-    // `ChunkedBuffer` is `O(log(n))`, but according to standard an iterator `+=` should be `O(1)` to be marked as
-    // random access. Otherwise something like `std::for_each` might turn out `O(n*log(n))` if implemented with `it+=1`
-    // instead of `it++`.
+    // When `start_idx` or `end_idx` are set we use `std::advance` which is inefficient for non-random-access iterators.
+    // OPTIM: Provide a `ColumnData::iterator_at(position)` for O(log n) random access. Making `ColumnDataIterator`
+    // fully random-access is tricky since `ChunkedBuffer` lookup is O(log n), not O(1) as the standard requires.
     if (input_column.is_sparse()) {
         auto begin = input_data.cbegin<input_tdt, IteratorType::ENUMERATED, IteratorDensity::SPARSE>();
         auto end = input_data.cend<input_tdt, IteratorType::ENUMERATED, IteratorDensity::SPARSE>();
@@ -284,8 +280,7 @@ static void transform(
         output_bitset.resize(left_input_column.last_row() + 1);
         auto left_accessor = random_accessor<left_input_tdt>(&left_input_data);
         auto right_accessor = random_accessor<right_input_tdt>(&right_input_data);
-        // TODO: experiment with more efficient bitset traversal methods
-        // https://github.com/tlk00/BitMagic/tree/master/samples/bvsample25
+        // OPTIM: Consider more efficient BitMagic traversal (see bvsample25).
         auto end_bit = bits_to_check.end();
         for (auto set_bit = bits_to_check.first(); set_bit < end_bit; ++set_bit) {
             if (f(left_accessor.at(*set_bit), right_accessor.at(*set_bit))) {

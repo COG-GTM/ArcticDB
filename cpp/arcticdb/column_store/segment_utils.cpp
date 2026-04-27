@@ -15,8 +15,8 @@ namespace arcticdb {
 
 ankerl::unordered_dense::set<entity::position_t> unique_values_for_string_column(const Column& column) {
     ankerl::unordered_dense::set<entity::position_t> output_set;
-    // Guessing that unique values is a third of the column length
-    // TODO would be useful to have actual unique count here from stats
+    // Guessing that unique values is a third of the column length.
+    // OPTIM: Use actual unique count from column stats if available.
     static auto map_reserve_ratio = ConfigsMap::instance()->get_int("UniqueColumns.AllocationRatio", 3);
     output_set.reserve(column.row_count() / map_reserve_ratio);
 

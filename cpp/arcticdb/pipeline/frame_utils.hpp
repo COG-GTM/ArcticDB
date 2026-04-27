@@ -288,10 +288,9 @@ std::optional<convert::StringEncodingError> set_array_type(
                 datatype_to_str(row_type_descriptor.data_type())
         );
         secondary_type = *common_type;
-        // TODO: If the input array contains unexpected elements such as None, NaN, string the type
-        //  descriptor will have data_type == BYTES_DYNAMIC64. TypeDescriptor::visit_tag does not have a
-        //  case for it and it will throw exception which is not meaningful. Adding BYTES_DYNAMIC64 in
-        //  TypeDescriptor::visit_tag leads to a bunch of compilation errors spread all over the code.
+        // FIXME: Unexpected elements (None, NaN, string) produce data_type == BYTES_DYNAMIC64 which causes
+        // a non-meaningful exception in TypeDescriptor::visit_tag. Adding BYTES_DYNAMIC64 support there
+        // causes widespread compilation errors.
         normalization::check<ErrorCode::E_UNIMPLEMENTED_COLUMN_SECONDARY_TYPE>(
                 is_numeric_type(row_type_descriptor.data_type()) || is_empty_type(row_type_descriptor.data_type()),
                 "Numpy array type {} is not implemented. Only dense int and float arrays are supported.",

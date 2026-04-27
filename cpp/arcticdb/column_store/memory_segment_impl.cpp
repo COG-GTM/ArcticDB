@@ -37,10 +37,9 @@ void check_output_bitset(
         const arcticdb::util::BitSet& output, const arcticdb::util::BitSet& filter,
         const arcticdb::util::BitSet& column_bitset
 ) {
-    // TODO: Do this in O(1)
-    // The logic here is that the filter bitset defines how the output bitset should look like
-    // The set bits in filter decides the row ids in the output. The corresponding values in sparse_map
-    // should match output bitset
+    // OPTIM: This is O(n) in the number of set filter bits. Could be O(1) with rank/select indices.
+    // The set bits in filter decide the row ids in the output. The corresponding values in sparse_map
+    // should match output bitset.
     auto filter_iter = filter.first();
     arcticdb::util::BitSetSizeType output_pos = 0;
     while (filter_iter != filter.end()) {
@@ -288,7 +287,8 @@ void SegmentInMemoryImpl::set_row_data(ssize_t rid) {
         column->set_row_data(row_id_);
 }
 
-StringPool& SegmentInMemoryImpl::string_pool() { return *string_pool_; } // TODO protected
+// OPTIM: Consider making this accessor protected to limit external mutation.
+StringPool& SegmentInMemoryImpl::string_pool() { return *string_pool_; }
 
 bool SegmentInMemoryImpl::compacted() const { return compacted_; }
 
@@ -299,7 +299,7 @@ void SegmentInMemoryImpl::check_magic() const { magic_.check(); }
 bool SegmentInMemoryImpl::allow_sparse() const { return allow_sparse_ == Sparsity::PERMITTED; }
 
 bool SegmentInMemoryImpl::is_sparse() const {
-    // TODO: Very slow, fix this by storing it in protobuf
+    // OPTIM: O(n) column scan on every call. Store sparsity flag in protobuf metadata instead.
     return std::ranges::any_of(columns_, [](const auto& c) { return c->is_sparse(); });
 }
 

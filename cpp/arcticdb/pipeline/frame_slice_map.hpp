@@ -52,7 +52,7 @@ struct FrameSliceMap {
                     // then append ["string"]. If we read with row range [0;1) we would end up reading the empty segment
                     // On read the empty type handler will fill the segment with not_a_string() and the reducer must
                     // run over them.
-                    // TODO: This logic won't be needed when we move string handling into separate type handler
+                    // OPTIM: Remove this workaround once string handling moves to a dedicated type handler.
                     if (is_empty_type(row_range_type)) {
                         const size_t global_field_idx = descriptor.find_field(field->name()).value();
                         const Field& global_field = descriptor.field(global_field_idx);

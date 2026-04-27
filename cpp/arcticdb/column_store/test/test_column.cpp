@@ -64,10 +64,7 @@ void test_column_type(size_t num_values = 20, size_t num_tests = 50) {
             auto t = v.value();
             ASSERT_TRUE(testValue.check_tensor(t));
         }
-        // TODO fix visitation with proper tensor
-        //         raw_type val = 0;
-        //         ASSERT_NO_THROW(column.visit(index, [&](auto &&x) { assign(*x.data(), val); }));
-        //         ASSERT_EQ(val, start);
+        // OPTIM: Re-enable visitation test once tensor-based visit API is available.
     }
 }
 

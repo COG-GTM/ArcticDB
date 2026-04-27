@@ -12,9 +12,8 @@
 
 namespace arcticdb {
 
+// OPTIM: `total_rows` should be uint64_t instead of size_t for explicitness, but requires widespread type changes.
 TimeseriesDescriptor make_timeseries_descriptor(
-        // TODO: It would be more explicit to use uint64_t instead of size_t. Not doing now as it involves a lot of type
-        // changes and needs to be done carefully.
         size_t total_rows, const StreamDescriptor& desc,
         arcticdb::proto::descriptors::NormalizationMetadata&& norm_meta,
         std::optional<arcticdb::proto::descriptors::UserDefinedMetadata>&& um, std::optional<AtomKey>&& prev_key,
@@ -40,7 +39,6 @@ TimeseriesDescriptor make_timeseries_descriptor(
     if (next_key)
         proto->mutable_next_key()->CopyFrom(key_to_proto(next_key.value()));
 
-    // TODO maybe need ensure_norm_meta?
     return TimeseriesDescriptor{
             std::move(frame_desc), std::move(segment_desc), std::move(proto), desc.fields_ptr(), desc.id()
     };

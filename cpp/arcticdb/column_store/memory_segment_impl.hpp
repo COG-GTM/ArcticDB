@@ -516,7 +516,7 @@ class SegmentInMemoryImpl {
 
     bool allow_sparse() const;
 
-    // TODO: Very slow, fix this by storing it in protobuf
+    // OPTIM: O(n) column scan — store sparsity flag in protobuf metadata instead.
     bool is_sparse() const;
 
     SegmentInMemoryImpl clone() const;

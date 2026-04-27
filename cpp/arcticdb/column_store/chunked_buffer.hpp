@@ -163,9 +163,8 @@ class ChunkedBufferImpl {
             if (size != DefaultBlockSize) {
                 output.handle_transition_to_irregular();
             }
-            // Presized buffers break invariant `num_irregular_blocks + 1 == block_offsets_.size()`
-            // `add_block` here does not add to `block_offsets_`
-            // TODO: Fix this by using `ensure` to call `add_block`.
+            // OPTIM: Presized buffers break invariant `num_irregular_blocks + 1 == block_offsets_.size()`
+            // because `add_block` does not update `block_offsets_`. Fix by using `ensure` to call `add_block`.
             output.add_block(size, 0UL);
         }
         output.ensure(size);
@@ -318,10 +317,8 @@ class ChunkedBufferImpl {
 
     [[nodiscard]] BlockAndOffset block_and_offset(size_t pos_bytes) const {
         if (allocation_type_ == entity::AllocationType::DETACHABLE) {
-            // Some constructions of a PRESIZED ChunkedBuffer can produce a single block with only a beginning offset,
-            // so we can't unify with below upper_bound logic.
-            // TODO: Make sure all constructions of ChunkedBuffer have valid block_offsets_ and unify this if with the
-            // rest.
+            // OPTIM: Some PRESIZED constructions produce a single block with only a beginning offset, so we can't
+            // unify with the upper_bound logic below. Fix all constructions to produce valid block_offsets_ first.
             util::check(!block_offsets_.empty(), "Detachable chunked buffer has no blocks");
             util::check(
                     pos_bytes >= block_offsets_.front() && pos_bytes < block_offsets_.back(),
@@ -470,9 +467,8 @@ class ChunkedBufferImpl {
 
     template<typename T>
     T* ptr_cast(size_t pos_bytes, size_t required_bytes) {
-        // TODO: This check doesn't verify we're overreaching outside of block boundaries.
-        // We should instead use `bytes_at` which does the correct check like so:
-        // return reinterpret_cast<T *>(bytes_at(pos_bytes, required_bytes))
+        // FIXME: This check doesn't verify we're overreaching outside of block boundaries.
+        // Should use `bytes_at` instead: return reinterpret_cast<T*>(bytes_at(pos_bytes, required_bytes))
         check_bytes(pos_bytes, required_bytes);
         return reinterpret_cast<T*>(&operator[](pos_bytes));
     }
@@ -661,9 +657,8 @@ class ChunkedBufferImpl {
         case MemBlockType::EXTERNAL_PACKED: {
             auto* packed_src = static_cast<ExternalPackedMemBlock*>(source);
             // Copying packed bits is less efficient than a memcpy.
-            // We don't use memcpy because it would result in a dest block with shift != 0
-            // Sparrow does not currently expose a convenient API to set a non-zero offset for bool columns.
-            // TODO: Use memcpy once sparrow exposes `slice_inplace` API. Monday ref: 11570513612
+            // We don't use memcpy because it would result in a dest block with shift != 0.
+            // OPTIM: Use memcpy once sparrow exposes `slice_inplace` API (Monday: 11570513612).
             copy_packed_bits(packed_src->data(), packed_src->shift() + pos, size, result->data());
             break;
         }
