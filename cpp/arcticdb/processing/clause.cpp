@@ -137,16 +137,19 @@ bool merge_update_string_column_timeseries(
         // If such a string is encountered in a column, then the GIL will be held until that whole column has
         // been processed, on the assumption that if a column has one such string it will probably have many.
         std::optional<ScopedGILLock> gil_lock;
-        // TODO: Create new column in case of insertion
+        // TODO: Insert support is not implemented for string columns in merge update. When a source row
+        // has no match in the target, a new row should be created in the target column.
         auto source_row_it = rows_to_update.begin();
         auto next_target_row_to_update = source_row_it->begin();
-        // TODO: Handle sparse target columns Monday 10756321294
+        // TODO: Handle sparse target columns. When the target column is sparse, unset rows are skipped by
+        // for_each_enumerated, so matched source rows targeting sparse positions will not be updated.
         arcticdb::for_each_enumerated<TDT>(target_column, [&](auto row) {
             source_row_it = std::find_if(
                     source_row_it,
                     rows_to_update.end(),
                     [&, new_row = false](const std::vector<size_t>& vec) mutable {
-                        // TODO: Handle inserts. Empty vec means insert.
+                        // TODO: Handle inserts. An empty vec means the source row has no match and should
+                        // be inserted into the target.
                         next_target_row_to_update = std::find_if(
                                 new_row ? vec.begin() : next_target_row_to_update,
                                 vec.end(),
@@ -1557,10 +1560,9 @@ std::vector<std::vector<EntityId>> MergeClause::structure_for_processing(
         std::vector<std::vector<EntityId>>&& entity_ids_vec
 ) {
 
-    // TODO this is a hack because we don't currently have a way to
-    // specify any particular input shape unless a clause is the
-    // first one and can use structure_for_processing. Ideally
-    // merging should be parallel like resampling
+    // TODO: This flattens all entity IDs into a single group, forcing serial processing. Clauses
+    // other than the first cannot currently specify input shape. Ideally merging would be parallelized
+    // like ResampleClause, which splits work across row-slice boundaries.
     auto entity_ids = util::flatten_vectors(std::move(entity_ids_vec));
     auto proc = gather_entities<std::shared_ptr<SegmentInMemory>, std::shared_ptr<RowRange>, std::shared_ptr<ColRange>>(
             *component_manager_, std::move(entity_ids)
@@ -2100,7 +2102,7 @@ std::vector<std::vector<size_t>> MergeUpdateClause::structure_for_processing_log
     using IndexType = ScalarTagType<DataTypeTag<DataType::NANOSECONDS_UTC64>>;
     std::vector<std::vector<size_t>> offsets = structure_by_row_slice(ranges_and_keys);
     std::vector<size_t> row_slices_to_keep;
-    // TODO: Arrow is not supported yet.
+    // TODO: Arrow input is not supported yet; an error is raised in process() if the source is Arrow.
     const TypedTensor<IndexType::DataTypeTag::raw_type> index_tensor(source_->opt_index_tensor().value());
     user_input::check<ErrorCode::E_INVALID_USER_ARGUMENT>(
             util::is_cstyle_array<IndexType::DataTypeTag::raw_type>(index_tensor),
@@ -2120,7 +2122,8 @@ std::vector<std::vector<size_t>> MergeUpdateClause::structure_for_processing_log
     }
     std::span index(static_cast<const IndexType::DataTypeTag::raw_type*>(index_tensor.data()), source_->num_rows);
     for (size_t row_slice_idx = 0; row_slice_idx < offsets.size(); ++row_slice_idx) {
-        // TODO: Add logic for insertion.
+        // TODO: Insert support not yet implemented. Source rows that fall outside all existing row slices
+        // should create new row slices.
         const TimestampRange& time_range = ranges_and_keys[offsets[row_slice_idx].front()].key_.time_range();
         if (source_start_end_for_row_range_.contains(time_range)) {
             row_slices_to_keep.push_back(row_slice_idx);
@@ -2165,9 +2168,7 @@ std::vector<EntityId> MergeUpdateClause::process(std::vector<EntityId>&& entity_
             std::shared_ptr<RowRange>,
             std::shared_ptr<ColRange>,
             std::shared_ptr<AtomKey>>(*component_manager_, std::move(entity_ids));
-    // TODO: Add exception handling two source rows matching the same target row. This should be done in the
-    // function
-    //  handling the "on" parameter matching multiple columns. Monday 10655943156
+    // Duplicate source-to-target row matching is validated in update_and_insert (matched_target_rows BitSet).
     auto matched = [&]() -> std::optional<std::vector<std::vector<size_t>>> {
         std::optional<std::vector<std::vector<size_t>>> result;
         if (source_->has_index()) {
@@ -2179,7 +2180,7 @@ std::vector<EntityId> MergeUpdateClause::process(std::vector<EntityId>&& entity_
         }
         return result;
     }();
-    // TODO: Source and target descriptor can differ for dynamic schema
+    // TODO: For dynamic schema the source and target descriptors can differ; currently both use source_->desc().
     matched = filter_on_additional_columns_match(
             source_->desc(), source_->desc(), source_->field_tensors(), proc, std::move(matched)
     );
@@ -2294,8 +2295,8 @@ bool MergeUpdateClause::update_and_insert(
     bool row_slice_changed = false;
     const bool is_timeseries = source_->desc().index().type() == IndexDescriptor::Type::TIMESTAMP;
     util::BitSet matched_target_rows(row_ranges.front()->diff());
-    // TODO: This can be inlined in the loop iterating over all columns to avoid iterating the source one more
-    // time. The loop structure makes it not intuitive. The performance cost must be evaluated. Monday: 10655963947
+    // TODO: This duplicate-check loop could be inlined into the per-column update loop below to avoid an extra
+    // pass over rows_to_update. Readability trade-off; profile before changing.
     for (size_t source_row_idx = 0; source_row_idx < rows_to_update.size(); ++source_row_idx) {
         for (const size_t target_row : rows_to_update[source_row_idx]) {
             user_input::check<ErrorCode::E_INVALID_USER_ARGUMENT>(
@@ -2382,7 +2383,8 @@ bool MergeUpdateClause::update_and_insert(
                         auto target_row_to_update_it = target_column_data.begin<ScalarType>();
                         size_t target_row_to_update_idx = 0;
                         for (size_t source_row_idx = 0; source_row_idx < source_data.size(); ++source_row_idx) {
-                            // TODO: Handle insert. Empty rows_to_update[source_row_idx] means that update must be done
+                            // TODO: Handle insert. Empty rows_to_update[source_row_idx] means the source row
+                            // has no target match and should be inserted.
                             row_slice_changed |= !rows_to_update[source_row_idx].empty();
                             for (const size_t target_row_idx : rows_to_update[source_row_idx]) {
                                 const size_t rows_to_skip = target_row_idx - target_row_to_update_idx;
@@ -2394,7 +2396,8 @@ bool MergeUpdateClause::update_and_insert(
                     } else {
                         auto target = random_accessor<ScalarType>(&target_column_data);
                         for (size_t source_row_idx = 0; source_row_idx < source_data.size(); ++source_row_idx) {
-                            // TODO: Handle insert. Empty rows_to_update[source_row_idx] means that update must be done
+                            // TODO: Handle insert. Empty rows_to_update[source_row_idx] means the source row
+                            // has no target match and should be inserted.
                             row_slice_changed |= !rows_to_update[source_row_idx].empty();
                             for (const size_t target_row_idx : rows_to_update[source_row_idx]) {
                                 target[target_row_idx] = source_data[source_row_idx];
@@ -2447,7 +2450,8 @@ std::vector<std::vector<size_t>> MergeUpdateClause::filter_index_match(
     // in the segment.
     while (target_row < last_target_row_to_consider && source_row < source_row_end) {
         const timestamp source_ts = source_index[source_row];
-        // TODO: Profile performance and try different optimizations. See Monday 10655963947
+        // TODO: Profile performance and consider alternative optimizations (e.g., inverting the loop
+        // when source rows outnumber target rows).
         auto row_index_view = std::ranges::iota_view{target_row, last_target_row_to_consider};
         auto target_match_it =
                 ranges::lower_bound(row_index_view, source_ts, [&](const size_t row_idx, const timestamp source) {
@@ -2526,7 +2530,7 @@ std::vector<std::vector<size_t>> MergeUpdateClause::filter_on_additional_columns
                             source_row_start,
                     source_row_end - source_row_start
             );
-            // TODO: For dynamic schema the two fields might have different indexes
+            // TODO: For dynamic schema the source and target fields may have different positional indexes.
             const size_t target_field_position = source_field_position;
             const ColumnWithStrings target_column = std::get<ColumnWithStrings>(
                     proc.get(ColumnName{target_descriptor.field(target_field_position).name()})
@@ -2537,7 +2541,8 @@ std::vector<std::vector<size_t>> MergeUpdateClause::filter_on_additional_columns
                     [&]<typename TargetDataTypeTag>(TargetDataTypeTag) {
                         using TargetTDT = ScalarTagType<TargetDataTypeTag>;
                         using TargetRawType = TargetDataTypeTag::raw_type;
-                        // TODO: Relax for dynamic schema
+                        // TODO: Relax this same-type constraint for dynamic schema where source and target
+                        // column types may legitimately differ.
                         if constexpr (std::same_as<std::decay_t<SourceDataTypeTag>, std::decay_t<TargetDataTypeTag>>) {
                             auto target_accessor = random_accessor<TargetTDT>(&target_data);
                             for (size_t source_row_idx = 0; source_row_idx < matched_rows.size(); ++source_row_idx) {
