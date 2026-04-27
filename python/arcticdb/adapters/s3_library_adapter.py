@@ -48,9 +48,6 @@ class ParsedQuery:
 
     path_prefix: Optional[str] = None
 
-    # DEPRECATED - see https://github.com/man-group/ArcticDB/pull/833
-    force_uri_lib_config: Optional[bool] = True
-
     # winhttp is used as s3 backend support on Windows by default; winhttp itself maintains ca cert.
     # The options has no effect on Windows
     CA_cert_path: Optional[str] = ""  # CURLOPT_CAINFO in curl
@@ -76,12 +73,6 @@ class S3LibraryAdapter(ArcticLibraryAdapter):
         self._bucket = match_groups["bucket"]
 
         self._query_params: ParsedQuery = self._parse_query(match["query"])
-
-        if self._query_params.force_uri_lib_config is False:
-            raise ValueError(
-                "The support of 'force_uri_lib_config=false' has been dropped due to security concerns. Please refer to"
-                " https://github.com/man-group/ArcticDB/pull/803 for more information."
-            )
 
         if self._query_params.port:
             self._endpoint += f":{self._query_params.port}"
@@ -180,6 +171,16 @@ class S3LibraryAdapter(ArcticLibraryAdapter):
 
         parsed_query = re.split("[;&]", query)
         parsed_query = {t.split("=", 1)[0]: t.split("=", 1)[1] for t in parsed_query}
+
+        # force_uri_lib_config was removed but may still appear in existing URIs.
+        # Setting it to false was never supported; true was a no-op.
+        if "force_uri_lib_config" in parsed_query:
+            if not bool(strtobool(parsed_query["force_uri_lib_config"][0])):
+                raise ValueError(
+                    "The support of 'force_uri_lib_config=false' has been dropped due to security concerns. Please refer to"
+                    " https://github.com/man-group/ArcticDB/pull/803 for more information."
+                )
+            del parsed_query["force_uri_lib_config"]
 
         field_dict = {field.name: field for field in fields(ParsedQuery)}
         for key in parsed_query.keys():

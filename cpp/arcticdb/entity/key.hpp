@@ -156,7 +156,8 @@ enum class KeyType : int {
      */
     OFFSET = 19,
     /*
-     * Temporary - remove_me
+     * No longer written by any code path. Retained because KeyType enum values are
+     * persisted to storage and removing or renumbering would break existing data.
      */
     BACKUP_SNAPSHOT_REF = 20,
     /*

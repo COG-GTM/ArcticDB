@@ -2945,7 +2945,6 @@ class NativeVersionStore:
         symbol: Optional[str] = None,
         snapshot: Optional[str] = None,
         latest_only: Optional[bool] = False,
-        iterate_on_failure: Optional[bool] = False,
         skip_snapshots: Optional[bool] = False,
     ) -> List[Dict]:
         """
@@ -2963,8 +2962,6 @@ class NativeVersionStore:
         latest_only : `bool`
             Only include the latest version for each returned symbol. Has no effect if `snapshot` argument is also
             specified.
-        iterate_on_failure: `bool`
-            DEPRECATED: Passing this doesn't change behavior
         skip_snapshots: `bool`
             Don't populate version list with snapshot information.
             Can improve performance significantly if there are many snapshots.
@@ -2991,11 +2988,6 @@ class NativeVersionStore:
         `List[Dict]`
             List of dictionaries describing the discovered versions in the library.
         """
-        if iterate_on_failure:
-            log.warning(
-                "The iterate_on_failure argument is deprecated and will soon be removed. It's safe to remove since it doesn't change behavior."
-            )
-
         if latest_only and snapshot and not NativeVersionStore._warned_about_list_version_latest_only_and_snapshot:
             log.warning("latest_only has no effect when snapshot is specified")
             NativeVersionStore._warned_about_list_version_latest_only_and_snapshot = True
@@ -3367,9 +3359,7 @@ class NativeVersionStore:
         self.delete_versions(symbol, delete_versions)
         log.info(f"Done deleting versions: {delete_versions} for symbol {symbol}")
 
-    def has_symbol(
-        self, symbol: str, as_of: Optional[VersionQueryInput] = None, iterate_on_failure: Optional[bool] = False
-    ) -> bool:
+    def has_symbol(self, symbol: str, as_of: Optional[VersionQueryInput] = None) -> bool:
         """
         Return True if the 'symbol' exists in this library AND the symbol isn't deleted in the specified as_of.
         It's possible for a deleted symbol to exist in snapshots.
@@ -3380,19 +3370,12 @@ class NativeVersionStore:
             symbol name
         as_of : `Optional[VersionQueryInput]`, default=None
             See documentation of `read` method for more details.
-        iterate_on_failure: `Optional[bool]`, default=False
-            DEPRECATED: Passing this doesn't change behavior
 
         Returns
         -------
         `bool`
             True if the symbol exists as_of the specified revision, False otherwise.
         """
-        if iterate_on_failure:
-            log.warning(
-                "The iterate_on_failure argument is deprecated and will soon be removed. It's safe to remove since it doesn't change behavior."
-            )
-
         return self._find_version(symbol, as_of=as_of, raise_on_missing=False) is not None
 
     def column_names(self, symbol: str, as_of: Optional[VersionQueryInput] = None) -> List[str]:
@@ -4040,11 +4023,13 @@ class NativeVersionStore:
         cxx_versioned_item = self.version_store._compact_data(symbol, rows_per_segment, prune_previous_version)
         return self._convert_thin_cxx_item_to_python(cxx_versioned_item, None)
 
-    # TODO: Mark these and Library methods as deprecated
     def is_symbol_fragmented(self, symbol: str, segment_size: Optional[int] = None) -> bool:
         """
         Check whether the number of segments that would be reduced by compaction is more than or equal to the
         value specified by the configuration option "SymbolDataCompact.SegmentCount" (defaults to 100).
+
+        .. deprecated::
+            Use ``defragment_symbol_data`` instead, which checks fragmentation internally.
 
         Parameters
         ----------
@@ -4063,6 +4048,11 @@ class NativeVersionStore:
         -------
         bool
         """
+        warn(
+            "is_symbol_fragmented is deprecated. Use defragment_symbol_data instead, which checks fragmentation internally.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.version_store.is_symbol_fragmented(symbol, segment_size)
 
     def defragment_symbol_data(

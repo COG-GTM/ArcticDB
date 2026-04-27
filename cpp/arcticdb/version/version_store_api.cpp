@@ -15,7 +15,6 @@
 #include <arcticdb/entity/descriptor_item.hpp>
 #include <arcticdb/pipeline/query.hpp>
 #include <arcticdb/pipeline/input_frame.hpp>
-#include <arcticdb/util/optional_defaults.hpp>
 #include <arcticdb/python/python_to_tensor_frame.hpp>
 #include <arcticdb/version/version_map_batch_methods.hpp>
 #include <arcticdb/version/version_utils.hpp>
@@ -429,7 +428,7 @@ std::pair<std::vector<AtomKey>, py::object> get_versions_and_metadata_from_snaps
 std::vector<std::pair<SnapshotId, py::object>> PythonVersionStore::list_snapshots(std::optional<bool> load_metadata) {
     ARCTICDB_RUNTIME_DEBUG(log::version(), "Command: list_snapshots");
     auto snap_ids = std::vector<std::pair<SnapshotId, py::object>>();
-    auto fetch_metadata = opt_false(load_metadata);
+    auto fetch_metadata = load_metadata && *load_metadata;
     iterate_snapshots(store(), [store = store(), &snap_ids, fetch_metadata](const VariantKey& vk) {
         auto snapshot_meta_as_pyobject = fetch_metadata ? get_metadata_for_snapshot(store, vk) : py::none{};
         auto snapshot_id = fmt::format("{}", variant_key_id(vk));

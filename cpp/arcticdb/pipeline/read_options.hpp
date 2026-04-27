@@ -9,7 +9,6 @@
 #pragma once
 
 #include <arcticdb/entity/output_format.hpp>
-#include <arcticdb/util/optional_defaults.hpp>
 #include <arcticdb/util/variant.hpp>
 #include <arcticdb/arrow/arrow_output_options.hpp>
 
@@ -40,7 +39,7 @@ struct ReadOptions {
 
     void set_incompletes(const std::optional<bool>& incompletes) { data_->incompletes_ = incompletes; }
 
-    [[nodiscard]] bool get_incompletes() const { return opt_false(data_->incompletes_); }
+    [[nodiscard]] bool get_incompletes() const { return data_->incompletes_ && *data_->incompletes_; }
 
     void set_dynamic_schema(const std::optional<bool>& dynamic_schema) { data_->dynamic_schema_ = dynamic_schema; }
 
