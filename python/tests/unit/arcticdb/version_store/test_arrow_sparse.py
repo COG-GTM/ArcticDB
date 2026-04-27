@@ -761,10 +761,6 @@ class TestSparseArrowGroupBy:
 class TestSparseArrowResample:
     sym = "test_sparse_resample"
 
-    # TODO: Also add testing for:
-    # - Aggregating string, datetime columns
-    # - Other resampling kwargs like offset, origin
-
     @pytest.fixture(autouse=True)
     def setup(self, version_store_factory):
         self.lib = version_store_factory(segment_row_size=4)
@@ -778,6 +774,24 @@ class TestSparseArrowResample:
                 "int_col": pa.array([1, None, 3, None, 5, None, None, None, None, None, 11, None], pa.int64()),
                 "float_col": pa.array(
                     [None, 2.0, None, 4.0, None, 6.0, None, None, None, 10.0, None, 12.0], pa.float64()
+                ),
+                "str_col": pa.array(["a", None, "b", None, "c", None, None, None, None, None, "d", None], pa.string()),
+                "dt_col": pa.array(
+                    [
+                        dates[0],
+                        None,
+                        dates[2],
+                        None,
+                        dates[4],
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        dates[10],
+                        None,
+                    ],
+                    pa.timestamp("ns"),
                 ),
             }
         )
@@ -817,6 +831,26 @@ class TestSparseArrowResample:
         q = QueryBuilder().date_range((start, end)).resample("3h").agg({"int_col": "sum"})
         sliced = self.pldf.filter(pl.col("ts").is_between(start, end, closed="both"))
         expected = sliced.group_by_dynamic("ts", every="3h").agg(pl.col("int_col").sum())
+        _check_query_result(self.lib, self.sym, q, expected)
+
+    @pytest.mark.parametrize("agg_op", ["first", "last", "count"])
+    @pytest.mark.parametrize("rule", ["3h", "6h"])
+    def test_string_column_agg(self, agg_op, rule):
+        q = QueryBuilder().resample(rule).agg({"str_col": agg_op})
+        expected = self.pldf.group_by_dynamic("ts", every=rule).agg(getattr(pl.col("str_col"), agg_op)())
+        _check_query_result(self.lib, self.sym, q, expected)
+
+    @pytest.mark.parametrize("agg_op", ["first", "last", "count", "min", "max"])
+    @pytest.mark.parametrize("rule", ["3h", "6h"])
+    def test_datetime_column_agg(self, agg_op, rule):
+        q = QueryBuilder().resample(rule).agg({"dt_col": agg_op})
+        expected = self.pldf.group_by_dynamic("ts", every=rule).agg(getattr(pl.col("dt_col"), agg_op)())
+        _check_query_result(self.lib, self.sym, q, expected)
+
+    @pytest.mark.parametrize("offset", ["1h", "2h"])
+    def test_resample_offset(self, offset):
+        q = QueryBuilder().resample("3h", offset=offset).agg({"int_col": "sum"})
+        expected = self.pldf.group_by_dynamic("ts", every="3h", offset=offset).agg(pl.col("int_col").sum())
         _check_query_result(self.lib, self.sym, q, expected)
 
 

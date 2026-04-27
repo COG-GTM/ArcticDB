@@ -1733,7 +1733,10 @@ def lmdb_or_in_memory_version_store_tiny_segment(request) -> Library:
         pytest.param("1.6.2", marks=VENV_COMPAT_TESTS_MARK),
         pytest.param("4.5.1", marks=VENV_COMPAT_TESTS_MARK),
         pytest.param("5.0.0", marks=VENV_COMPAT_TESTS_MARK),
-    ],  # TODO: Extend this list with other old versions
+        pytest.param("5.4.1", marks=VENV_COMPAT_TESTS_MARK),
+        pytest.param("5.9.3", marks=VENV_COMPAT_TESTS_MARK),
+        pytest.param("6.1.1", marks=VENV_COMPAT_TESTS_MARK),
+    ],
 )
 def old_venv(request, tmp_path_factory):
     version = request.param

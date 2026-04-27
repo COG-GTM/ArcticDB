@@ -1177,7 +1177,6 @@ def test_filter_ternary_dynamic_missing_columns(lmdb_version_store_dynamic_schem
     assert_frame_equal(expected, received)
 
 
-# TODO: Assert that the projected column is of type float64 after modify_schema change is merged
 @use_of_function_scoped_fixtures_in_hypothesis_checked
 @settings(deadline=None)
 @given(
@@ -1214,8 +1213,12 @@ def test_ternary_hypothesis(lmdb_version_store_v1, df, any_output_format):
     )
     q = QueryBuilder()
     q = q.apply("projected", where(q["condition"].isnull(), q["col1"], q["col2"]))
-    assert_frame_equal(expected, lib.read(dense_sym, query_builder=q).data, check_dtype=False)
-    assert_frame_equal(expected, lib.read(sparse_sym, query_builder=q).data, check_dtype=False)
+    dense_result = lib.read(dense_sym, query_builder=q).data
+    sparse_result = lib.read(sparse_sym, query_builder=q).data
+    assert dense_result["projected"].dtype == np.float64
+    assert sparse_result["projected"].dtype == np.float64
+    assert_frame_equal(expected, dense_result, check_dtype=False)
+    assert_frame_equal(expected, sparse_result, check_dtype=False)
     # col/val
     expected = df.copy(deep=True)
     expected["projected"] = np.where(expected["condition"].isnull().to_numpy(), expected["col1"].to_numpy(), 2000.0)
