@@ -531,7 +531,6 @@ class VersionMapImpl {
 
     /**
      * @param skip_compat Do not check the legacy "journal" entries
-     * @param iterate_on_failure Use `iterate_type` (slow!) if the linked-list-based load logic throws
      */
     std::shared_ptr<VersionMapEntry> check_reload(
             std::shared_ptr<Store> store, const StreamId& stream_id, const LoadStrategy& load_strategy,
