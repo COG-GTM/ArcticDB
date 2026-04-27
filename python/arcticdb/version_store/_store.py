@@ -4040,11 +4040,13 @@ class NativeVersionStore:
         cxx_versioned_item = self.version_store._compact_data(symbol, rows_per_segment, prune_previous_version)
         return self._convert_thin_cxx_item_to_python(cxx_versioned_item, None)
 
-    # TODO: Mark these and Library methods as deprecated
     def is_symbol_fragmented(self, symbol: str, segment_size: Optional[int] = None) -> bool:
         """
         Check whether the number of segments that would be reduced by compaction is more than or equal to the
         value specified by the configuration option "SymbolDataCompact.SegmentCount" (defaults to 100).
+
+        .. deprecated::
+            Use ``defragment_symbol_data`` instead, which checks fragmentation internally.
 
         Parameters
         ----------
@@ -4063,6 +4065,11 @@ class NativeVersionStore:
         -------
         bool
         """
+        warn(
+            "is_symbol_fragmented is deprecated. Use defragment_symbol_data instead, which checks fragmentation internally.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.version_store.is_symbol_fragmented(symbol, segment_size)
 
     def defragment_symbol_data(

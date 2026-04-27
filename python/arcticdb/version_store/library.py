@@ -9,6 +9,7 @@ As of the Change Date specified in that file, in accordance with the Business So
 import copy
 import datetime
 import os
+import warnings
 
 import pytz
 from enum import Enum, auto
@@ -3256,6 +3257,9 @@ class Library:
         Check whether the number of segments that would be reduced by compaction is more than or equal to the
         value specified by the configuration option "SymbolDataCompact.SegmentCount" (defaults to 100).
 
+        .. deprecated::
+            Use ``defragment_symbol_data`` instead, which checks fragmentation internally.
+
         Parameters
         ----------
         symbol: `str`
@@ -3273,6 +3277,11 @@ class Library:
         -------
         bool
         """
+        warnings.warn(
+            "is_symbol_fragmented is deprecated. Use defragment_symbol_data instead, which checks fragmentation internally.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self._nvs.is_symbol_fragmented(symbol, segment_size)
 
     def defragment_symbol_data(
