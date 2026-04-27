@@ -165,8 +165,6 @@ class LibraryTool(LibraryToolImpl):
         return self._nvs.read_index(symbol, as_of, **kwargs)
 
     def normalize_dataframe_with_nvs_defaults(self, df: pd.DataFrame):
-        # TODO: Have a unified place where we resolve all the normalization parameters and use that here.
-
         from arcticdb.version_store._store import resolve_defaults
 
         # Currently all these parameters are resolved in various places throughout the _store.py. This can result in

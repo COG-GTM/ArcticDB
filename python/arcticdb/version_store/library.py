@@ -9,6 +9,7 @@ As of the Change Date specified in that file, in accordance with the Business So
 import copy
 import datetime
 import os
+from warnings import warn
 
 import pytz
 from enum import Enum, auto
@@ -3253,6 +3254,8 @@ class Library:
 
     def is_symbol_fragmented(self, symbol: str, segment_size: Optional[int] = None) -> bool:
         """
+        Deprecated: Use :py:meth:`compact_data_experimental` instead.
+
         Check whether the number of segments that would be reduced by compaction is more than or equal to the
         value specified by the configuration option "SymbolDataCompact.SegmentCount" (defaults to 100).
 
@@ -3273,6 +3276,11 @@ class Library:
         -------
         bool
         """
+        warn(
+            "is_symbol_fragmented is deprecated. Use compact_data_experimental instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self._nvs.is_symbol_fragmented(symbol, segment_size)
 
     def defragment_symbol_data(
@@ -3282,6 +3290,8 @@ class Library:
         prune_previous_versions: bool = False,
     ) -> VersionedItem:
         """
+        Deprecated: Use :py:meth:`compact_data_experimental` instead.
+
         Compacts fragmented segments by merging row-sliced segments (https://docs.arcticdb.io/technical/on_disk_storage/#data-layer).
         This method calls `is_symbol_fragmented` to determine whether to proceed with the defragmentation operation.
 
@@ -3340,6 +3350,11 @@ class Library:
         Config map setting - SymbolDataCompact.SegmentCount will be replaced by a library setting
         in the future. This API will allow overriding the setting as well.
         """
+        warn(
+            "defragment_symbol_data is deprecated. Use compact_data_experimental instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self._nvs.defragment_symbol_data(symbol, segment_size, prune_previous_versions)
 
     def merge_experimental(

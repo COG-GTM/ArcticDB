@@ -109,12 +109,12 @@ class GracefulProcessUtils:
             GracefulProcessUtils.wait(p, 2)
         try:
             p.terminate()
-        except:
+        except OSError:
             pass
         if not _WINDOWS:
             exitcode = GracefulProcessUtils.wait(p, 2)
             if exitcode is None:
-                os.kill(p.pid, signal.SIGKILL)  # TODO (python37): use Process.kill()
+                p.kill()
 
 
 def wait_for_server_to_come_up(url: str, service: str, process: ProcessUnion, *, timeout=20, sleep=0.2, req_timeout=1):

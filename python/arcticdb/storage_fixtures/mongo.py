@@ -94,7 +94,7 @@ class MongoDatabase(StorageFixture):
         return cfg
 
     def set_permission(self, *, read: bool, write: bool):
-        raise NotImplementedError("Will support setting permissions on Mongo soon")  # TODO
+        raise NotImplementedError("Setting permissions on Mongo is not yet supported")
 
 
 class ExternalMongoDBServer(StorageFixtureFactory):

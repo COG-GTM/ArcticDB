@@ -321,7 +321,7 @@ def _diff_long_stream_descriptor_mismatch(nvs):  # Diffing strings is easier don
         yield
     except StreamDescriptorMismatch as sdm:
         nvs.last_mismatch_msg = sdm.args[0]
-        # TODO: This is too hacky. Consider providing a useful exception in C++ instead of string munging in Python.
+        # Workaround: parse the C++ exception message to produce a readable diff
         preamble, stream_id, existing, new_val = sdm.args[0].split("; ")
         existing = _STREAM_DESCRIPTOR_SPLIT.split(existing[existing.find("=") + 1 :])
         new_val = _STREAM_DESCRIPTOR_SPLIT.split(new_val[new_val.find("=") + 1 :])
@@ -846,10 +846,6 @@ class NativeVersionStore:
         recursive_normalize_msgpack_no_pickle_fallback = kwargs.get(
             "recursive_normalize_msgpack_no_pickle_fallback", None
         )
-
-        # TODO remove me when dynamic strings is the default everywhere
-        if parallel:
-            dynamic_strings = True
 
         coerce_columns = kwargs.get("coerce_columns", None)
         sparsify_floats = kwargs.get("sparsify_floats", False)
@@ -3537,7 +3533,7 @@ class NativeVersionStore:
                 dataframe=item,
                 metadata=None,
                 pickle_on_failure=False,
-                dynamic_strings=False,  # TODO: Enable it when on by default.
+                dynamic_strings=True,
                 coerce_columns=None,
             )
         except Exception:
@@ -4040,9 +4036,10 @@ class NativeVersionStore:
         cxx_versioned_item = self.version_store._compact_data(symbol, rows_per_segment, prune_previous_version)
         return self._convert_thin_cxx_item_to_python(cxx_versioned_item, None)
 
-    # TODO: Mark these and Library methods as deprecated
     def is_symbol_fragmented(self, symbol: str, segment_size: Optional[int] = None) -> bool:
         """
+        Deprecated: Use ``compact_data_experimental`` instead.
+
         Check whether the number of segments that would be reduced by compaction is more than or equal to the
         value specified by the configuration option "SymbolDataCompact.SegmentCount" (defaults to 100).
 
@@ -4063,6 +4060,11 @@ class NativeVersionStore:
         -------
         bool
         """
+        warn(
+            "is_symbol_fragmented is deprecated. Use compact_data_experimental instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.version_store.is_symbol_fragmented(symbol, segment_size)
 
     def defragment_symbol_data(
@@ -4073,6 +4075,8 @@ class NativeVersionStore:
         **kwargs,
     ) -> VersionedItem:
         """
+        Deprecated: Use ``compact_data_experimental`` instead.
+
         Compacts fragmented segments by merging row-sliced segments (https://docs.arcticdb.io/technical/on_disk_storage/#data-layer).
         This method calls `is_symbol_fragmented` to determine whether to proceed with the defragmentation operation.
 
@@ -4130,6 +4134,11 @@ class NativeVersionStore:
         Config map setting - SymbolDataCompact.SegmentCount will be replaced by a library setting
         in the future. This API will allow overriding the setting as well.
         """
+        warn(
+            "defragment_symbol_data is deprecated. Use compact_data_experimental instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         self._validate_kwargs("defragment_symbol_data", {"prune_previous_version"}, kwargs)
 
         proto_cfg = self._lib_cfg.lib_desc.version.write_options
