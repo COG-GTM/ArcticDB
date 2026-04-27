@@ -3359,9 +3359,7 @@ class NativeVersionStore:
         self.delete_versions(symbol, delete_versions)
         log.info(f"Done deleting versions: {delete_versions} for symbol {symbol}")
 
-    def has_symbol(
-        self, symbol: str, as_of: Optional[VersionQueryInput] = None
-    ) -> bool:
+    def has_symbol(self, symbol: str, as_of: Optional[VersionQueryInput] = None) -> bool:
         """
         Return True if the 'symbol' exists in this library AND the symbol isn't deleted in the specified as_of.
         It's possible for a deleted symbol to exist in snapshots.
