@@ -318,8 +318,9 @@ NormalizationMetadata accumulate_norm_metadata(
         const auto& arrow_meta = accumulated.has_experimental_arrow() ? accumulated : other;
         const auto& pandas_meta = accumulated.has_experimental_arrow() ? other : accumulated;
         const auto& common = pandas_meta.has_series() ? pandas_meta.series().common() : pandas_meta.df().common();
-        // TODO: When arrow normalization metadata is finalized we can consider allowing
-        // concat(arrow,pandas_with_multiindex)
+        // TODO: Once arrow normalization metadata is finalized, consider allowing
+        // concat(arrow, pandas_with_multiindex). Currently blocked on arrow metadata not carrying
+        // enough detail to reconcile with pandas multi-index.
         schema::check<ErrorCode::E_DESCRIPTOR_MISMATCH>(
                 common.has_index(), "Cannot join arrow-written data with multi-indexed pandas data"
         );

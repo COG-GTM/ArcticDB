@@ -489,9 +489,8 @@ SegmentInMemory MeanAggregatorData::finalize(const ColumnName& output_column_nam
         sparse_map_.resize(unique_values);
         auto col =
                 create_output_column(make_scalar_type(get_output_data_type()), std::move(sparse_map_), unique_values);
-        // TODO: Empty type needs more thought. Currently we emit a fully sparse column which will be populated by
-        // `copy_frame_data_to_buffer` but this might not be the right approach. As of this PR (11.09.2025) the empty
-        // type is feature flagged and not used so we don't worry too much about optimizing it.
+        // TODO: EMPTYVAL handling emits a fully sparse column populated by copy_frame_data_to_buffer. This works
+        // but may not be the optimal approach. Revisit when the empty type is no longer feature-flagged.
         if (data_type_ && *data_type_ == DataType::EMPTYVAL) [[unlikely]] {
             auto empty_bitset = util::BitSet(unique_values);
             col->set_sparse_map(std::move(empty_bitset));

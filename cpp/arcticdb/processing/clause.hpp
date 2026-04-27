@@ -115,13 +115,13 @@ struct PassthroughClause {
 
     [[nodiscard]] std::vector<std::vector<size_t>> structure_for_processing(std::vector<RangesAndKey>& ranges_and_keys
     ) {
-        return structure_by_row_slice(ranges_and_keys); // TODO: No structuring?
+        return structure_by_row_slice(ranges_and_keys); // TODO: Consider returning unstructured data instead.
     }
 
     [[nodiscard]] std::vector<std::vector<EntityId>> structure_for_processing(
             std::vector<std::vector<EntityId>>&& entity_ids_vec
     ) {
-        return entity_ids_vec; // TODO: structure by row slice?
+        return entity_ids_vec; // TODO: Consider structuring by row slice for consistency.
     }
 
     [[nodiscard]] std::vector<EntityId> process(std::vector<EntityId>&& entity_ids) const;
