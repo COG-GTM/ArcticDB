@@ -27,6 +27,8 @@ from arcticdb.version_store.library import (
     WriteMetadataPayload,
 )
 from arcticdb.version_store.admin_tools import KeyType, Size
+from arcticdb.version_store._normalization import set_allow_pickle_reads
+from arcticdb.exceptions import UnsafePickleReadError
 
 set_config_from_env_vars(_os.environ)
 

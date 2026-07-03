@@ -121,6 +121,29 @@ ArcticDB uses a type-based dispatch system. Normalizers inherit from `Normalizer
 | TimeFrame | `TimeFrameNormalizer` |
 | Arbitrary objects | `MsgPackNormalizer` (fallback) |
 
+## Pickle Reads (Security)
+
+Non-normalizable objects and user-defined metadata are stored by `MsgPackNormalizer` as pickle
+bytes wrapped in a msgpack `ExtType` (`PY_PICKLE_2`/`PY_PICKLE_3`). Unpickling on read executes
+arbitrary code embedded in the stored bytes, so a writer to shared storage could achieve remote
+code execution in a reader's process.
+
+Reading such payloads is therefore **disabled by default**. When `MsgPackNormalizer._ext_hook`
+encounters a `PY_PICKLE_*` code it calls `_check_pickle_read_allowed`, which raises
+`UnsafePickleReadError` unless pickle reads have been explicitly enabled. This gates every read
+path (whole-symbol denormalize and `denormalize_user_metadata`). Note `strict_mode` only blocks
+*writing* new pickles; it does not affect the read gate.
+
+Opt in (only when every writer to the library is trusted), highest precedence first:
+
+| Mechanism | Scope |
+|-----------|-------|
+| `MsgPackNormalizer.allow_pickle_reads = True` | Per-instance override |
+| `arcticdb.set_allow_pickle_reads(True)` (`None` to defer to env) | Process-wide |
+| `ARCTICDB_ALLOW_PICKLE_READS=1` env var | Process-wide default |
+
+See `_normalization.py:allow_pickle_reads` / `set_allow_pickle_reads`.
+
 ## String Handling
 
 ### Dynamic Strings

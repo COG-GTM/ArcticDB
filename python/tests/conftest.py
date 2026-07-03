@@ -134,6 +134,21 @@ def _set_multiprocessing_start_method_for_macos():
             pass
 
 
+# ArcticDB refuses to unpickle stored symbols/metadata on read by default (RCE hardening).
+# The test suite writes and reads back its own trusted pickled data, so enable pickle reads
+# for all tests. Default-off behaviour and the opt-in are covered explicitly in
+# tests/unit/arcticdb/version_store/test_normalization.py.
+@pytest.fixture(autouse=True)
+def _allow_pickle_reads_in_tests():
+    from arcticdb.version_store import _normalization
+
+    _normalization.set_allow_pickle_reads(True)
+    try:
+        yield
+    finally:
+        _normalization.set_allow_pickle_reads(None)
+
+
 # silence warnings about custom markers
 def pytest_configure(config):
     config.addinivalue_line("markers", "storage: Mark tests related to storage functionality")

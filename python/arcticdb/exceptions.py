@@ -24,6 +24,23 @@ class ArcticDbNotYetImplemented(ArcticException):
 ArcticNativeNotYetImplemented = ArcticDbNotYetImplemented
 
 
+class UnsafePickleReadError(ArcticException):
+    """Raised on read when a stored symbol or user-defined metadata payload can only be
+    decoded by unpickling, but pickle reads have not been explicitly enabled.
+
+    ArcticDB stores non-normalizable objects and user metadata as pickle bytes. Unpickling
+    executes arbitrary code embedded in the payload, so a writer to shared storage could plant
+    a malicious payload that runs in the reader's process (remote code execution). Reading such
+    payloads is therefore disabled by default.
+
+    Enable it only if you trust every writer to the libraries you read, either process-wide via
+    ``arcticdb.set_allow_pickle_reads(True)`` / the ``ARCTICDB_ALLOW_PICKLE_READS`` environment
+    variable.
+    """
+
+    pass
+
+
 class LibraryNotFound(ArcticException):
     pass
 
