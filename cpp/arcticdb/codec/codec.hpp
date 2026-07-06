@@ -54,7 +54,7 @@ void decode_into_memory_segment(
 template<class DataSink>
 std::size_t decode_field(
         const entity::TypeDescriptor& td, const EncodedFieldImpl& field, const uint8_t* input, DataSink& data_sink,
-        std::optional<util::BitMagic>& bv, arcticdb::EncodingVersion encoding_version
+        std::optional<util::BitMagic>& bv, arcticdb::EncodingVersion encoding_version, const uint8_t* end = nullptr
 );
 
 std::optional<google::protobuf::Any> decode_metadata_from_segment(const Segment& segment);

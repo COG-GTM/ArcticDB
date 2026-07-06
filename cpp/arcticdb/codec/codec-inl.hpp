@@ -171,7 +171,7 @@ std::size_t decode_ndarray(
 template<class DataSink>
 std::size_t decode_field(
         const TypeDescriptor& td, const EncodedFieldImpl& field, const std::uint8_t* input, DataSink& data_sink,
-        std::optional<util::BitMagic>& bv, EncodingVersion encoding_version, const std::uint8_t* end = nullptr
+        std::optional<util::BitMagic>& bv, EncodingVersion encoding_version, const std::uint8_t* end
 ) {
     size_t magic_size = 0u;
     if (encoding_version != EncodingVersion::V1) {
