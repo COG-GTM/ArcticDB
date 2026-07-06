@@ -11,9 +11,28 @@
 #include <arcticdb/util/preconditions.hpp>
 
 #include <cstdint>
+#include <cstddef>
 #include <climits>
+#include <string_view>
 
 namespace arcticdb::util {
+
+// Validates that `size` bytes can be read starting at `ptr` without running past `end`.
+// When `end` is null the caller has not supplied a bound and the check is skipped, preserving
+// the behaviour of decode paths that operate on already-validated in-memory data.
+inline void check_buffer_bounds(const uint8_t* ptr, std::size_t size, const uint8_t* end, std::string_view context) {
+    if (end == nullptr)
+        return;
+    const auto remaining = ptr <= end ? static_cast<std::size_t>(end - ptr) : std::size_t(0);
+    codec::check<ErrorCode::E_DECODE_ERROR>(
+            ptr <= end && size <= remaining,
+            "Buffer overflow while decoding {}: require {} bytes but only {} remain before the end of the segment",
+            context,
+            size,
+            remaining
+    );
+}
+
 template<char a, char b, char c, char d>
 struct MagicNum {
     static constexpr uint64_t Magic =
@@ -63,6 +82,15 @@ void check_magic_in_place(const uint8_t*& pos) {
 
 template<typename MagicNumType>
 void check_magic(const uint8_t*& pos) {
+    check_magic_in_place<MagicNumType>(pos);
+    pos += sizeof(MagicNumType);
+}
+
+// Bounds-checked variant: verifies that the magic number lies within `[pos, end)` before reading it,
+// so a truncated or forged on-disk header cannot drive a read past the segment buffer.
+template<typename MagicNumType>
+void check_magic(const uint8_t*& pos, const uint8_t* end) {
+    check_buffer_bounds(pos, sizeof(MagicNumType), end, "magic number");
     check_magic_in_place<MagicNumType>(pos);
     pos += sizeof(MagicNumType);
 }

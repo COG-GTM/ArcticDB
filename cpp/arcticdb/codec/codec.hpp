@@ -41,7 +41,8 @@ SizeResult max_compressed_size_dispatch(
 );
 
 EncodedFieldCollection decode_encoded_fields(
-        const SegmentHeader& hdr, const uint8_t* data, const uint8_t* begin ARCTICDB_UNUSED
+        const SegmentHeader& hdr, const uint8_t* data, const uint8_t* begin ARCTICDB_UNUSED,
+        const uint8_t* end = nullptr
 );
 
 SegmentInMemory decode_segment(Segment& segment, AllocationType allocation_type = AllocationType::DYNAMIC);
@@ -67,7 +68,7 @@ std::optional<TimeseriesDescriptor> decode_timeseries_descriptor_for_incompletes
 
 HashedValue get_segment_hash(Segment& seg);
 
-SegmentDescriptorImpl read_segment_descriptor(const uint8_t*& data);
+SegmentDescriptorImpl read_segment_descriptor(const uint8_t*& data, const uint8_t* end = nullptr);
 
 } // namespace arcticdb
 

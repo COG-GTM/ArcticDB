@@ -15,6 +15,8 @@
 #include <arcticdb/stream/row_builder.hpp>
 #include <arcticdb/stream/aggregator.hpp>
 #include <arcticdb/codec/typed_block_encoder_impl.hpp>
+#include <arcticdb/util/error_code.hpp>
+#include <arcticdb/util/magic_num.hpp>
 
 #include <gtest/gtest.h>
 
@@ -823,4 +825,57 @@ TEST(Segment, TestIdenticalProduceSameHashesV2) {
     auto hash_2 = get_segment_hash(seg_2);
 
     ASSERT_EQ(hash_1, hash_2);
+}
+
+TEST(Codec, CheckBufferBoundsRejectsOverread) {
+    std::array<uint8_t, 16> buf{};
+    const uint8_t* const end = buf.data() + buf.size();
+    EXPECT_NO_THROW(util::check_buffer_bounds(buf.data(), buf.size(), end, "exact fit"));
+    EXPECT_THROW(util::check_buffer_bounds(buf.data(), buf.size() + 1, end, "overflow"), ArcticException);
+    EXPECT_THROW(util::check_buffer_bounds(end + 1, 0, end, "past end"), ArcticException);
+    // A null end disables checking, preserving the behaviour of callers without bounds information.
+    EXPECT_NO_THROW(util::check_buffer_bounds(buf.data(), buf.size() + 1024, nullptr, "no end"));
+}
+
+TEST(Segment, DecodeV2RejectsOutOfBoundsFooterOffset) {
+    const auto stream_desc =
+            stream_descriptor(StreamId{"thing"}, RowCountIndex{}, {scalar_field(DataType::UINT8, "ints")});
+    SegmentInMemory in_mem_seg{stream_desc.clone()};
+    in_mem_seg.set_scalar<uint8_t>(0, 23);
+    in_mem_seg.end_row();
+    auto seg = encode_v2(std::move(in_mem_seg), codec::default_lz4_codec());
+    std::vector<uint8_t> vec;
+    const auto bytes = seg.calculate_size();
+    vec.resize(bytes);
+    seg.write_to(vec.data());
+    auto unserialized = Segment::from_bytes(vec.data(), bytes);
+    unserialized.header().set_footer_offset(unserialized.buffer().bytes() + 1024);
+    SegmentInMemory decoded{stream_desc.clone()};
+    EXPECT_THROW(decode_v2(unserialized, unserialized.header(), decoded, unserialized.descriptor()), ArcticException);
+}
+
+TEST(Segment, DecodeV2RejectsOversizedBlock) {
+    const auto stream_desc =
+            stream_descriptor(StreamId{"thing"}, RowCountIndex{}, {scalar_field(DataType::UINT8, "ints")});
+    SegmentInMemory in_mem_seg{stream_desc.clone()};
+    in_mem_seg.set_scalar<uint8_t>(0, 23);
+    in_mem_seg.end_row();
+    TimeseriesDescriptor tsd;
+    tsd.set_total_rows(1);
+    tsd.set_stream_descriptor(stream_desc);
+    in_mem_seg.set_timeseries_descriptor(tsd);
+    auto seg = encode_v2(std::move(in_mem_seg), codec::default_lz4_codec());
+    std::vector<uint8_t> vec;
+    const auto bytes = seg.calculate_size();
+    vec.resize(bytes);
+    seg.write_to(vec.data());
+    auto unserialized = Segment::from_bytes(vec.data(), bytes);
+    // Inflate the on-disk compressed size of the metadata block so the decoder would read past the
+    // segment body if the buffer end were not enforced.
+    auto& meta_field = unserialized.header().mutable_metadata_field(0);
+    ASSERT_GT(meta_field.values_size(), 0);
+    auto* value_block = meta_field.blocks() + meta_field.shapes_size();
+    value_block->set_out_bytes(1u << 30);
+    SegmentInMemory decoded{stream_desc.clone()};
+    EXPECT_THROW(decode_v2(unserialized, unserialized.header(), decoded, unserialized.descriptor()), ArcticException);
 }
