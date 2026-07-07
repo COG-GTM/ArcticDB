@@ -46,7 +46,11 @@ from arcticdb.version_store._normalization import (
     DataFrameNormalizer,
     NdArrayNormalizer,
     NPDDataFrame,
+    set_allow_pickle_reads,
+    allow_pickle_reads,
+    _ALLOW_PICKLE_READS_ENV_VAR,
 )
+from arcticdb.exceptions import UnsafePickleReadError
 from arcticdb.version_store._common import TimeFrame
 from arcticdb.util.test import (
     CustomThing,
@@ -423,6 +427,79 @@ def test_custom_pack_timedelta():
 def test_msg_pack_normalizer_strict_mode():
     norm = test_msgpack_normalizer
     assert not norm.strict_mode
+
+
+@pytest.fixture
+def _pickle_reads_reset():
+    # The suite-wide autouse fixture enables pickle reads; reset to the real default (defer to
+    # env var, which is unset) so these tests exercise the genuine default-off behaviour.
+    set_allow_pickle_reads(None)
+    try:
+        yield
+    finally:
+        set_allow_pickle_reads(True)
+
+
+def _pack_pickle_payload():
+    # Packing (write) is gated by strict_mode/disallow_pickle only, both off here, so this
+    # pickles regardless of the read-side allow_pickle_reads flag.
+    return MsgPackNormalizer()._msgpack_packb(errors.BoundaryError("bananas"))
+
+
+def test_read_pickle_disabled_by_default(monkeypatch, _pickle_reads_reset):
+    monkeypatch.delenv(_ALLOW_PICKLE_READS_ENV_VAR, raising=False)
+    assert not allow_pickle_reads()
+    packed = _pack_pickle_payload()
+    norm = MsgPackNormalizer()
+    with pytest.raises(UnsafePickleReadError):
+        norm._msgpack_unpackb(packed)
+
+
+def test_read_pickle_global_opt_in(_pickle_reads_reset):
+    packed = _pack_pickle_payload()
+    norm = MsgPackNormalizer()
+    set_allow_pickle_reads(True)
+    data = norm._msgpack_unpackb(packed)
+    assert isinstance(data, errors.BoundaryError)
+    assert data.args[0] == "bananas"
+
+
+def test_read_pickle_instance_opt_in_overrides_global(_pickle_reads_reset):
+    packed = _pack_pickle_payload()
+    set_allow_pickle_reads(False)
+    norm = MsgPackNormalizer()
+    norm.allow_pickle_reads = True
+    data = norm._msgpack_unpackb(packed)
+    assert isinstance(data, errors.BoundaryError)
+
+
+def test_read_pickle_env_var_opt_in(monkeypatch, _pickle_reads_reset):
+    packed = _pack_pickle_payload()
+    norm = MsgPackNormalizer()
+    monkeypatch.setenv(_ALLOW_PICKLE_READS_ENV_VAR, "1")
+    assert allow_pickle_reads()
+    assert isinstance(norm._msgpack_unpackb(packed), errors.BoundaryError)
+    monkeypatch.setenv(_ALLOW_PICKLE_READS_ENV_VAR, "0")
+    assert not allow_pickle_reads()
+    with pytest.raises(UnsafePickleReadError):
+        norm._msgpack_unpackb(packed)
+
+
+def test_non_pickle_read_allowed_when_pickle_disabled(monkeypatch, _pickle_reads_reset):
+    monkeypatch.delenv(_ALLOW_PICKLE_READS_ENV_VAR, raising=False)
+    assert not allow_pickle_reads()
+    norm = MsgPackNormalizer()
+    packed = norm._msgpack_packb({"a": "1", "b": 2, "c": 3.0})
+    assert norm._msgpack_unpackb(packed) == {"a": "1", "b": 2, "c": 3.0}
+
+
+def test_user_metadata_pickle_disabled_by_default(monkeypatch, _pickle_reads_reset):
+    monkeypatch.delenv(_ALLOW_PICKLE_READS_ENV_VAR, raising=False)
+    udm = normalize_metadata({"obj": errors.BoundaryError("bananas")})
+    with pytest.raises(UnsafePickleReadError):
+        denormalize_user_metadata(udm)
+    set_allow_pickle_reads(True)
+    assert denormalize_user_metadata(udm)["obj"].args[0] == "bananas"
 
 
 NT = namedtuple("NT", ["X", "Y"])

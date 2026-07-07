@@ -38,6 +38,7 @@ from arcticdb.exceptions import (
     ArcticDbNotYetImplemented,
     NormalizationException,
     UnsortedDataException,
+    UnsafePickleReadError,
 )
 from arcticdb.supported_types import DateRangeInput, time_types as supported_time_types
 from arcticdb.util._versions import IS_PANDAS_TWO, IS_PANDAS_ZERO
@@ -1367,6 +1368,42 @@ class DataFrameNormalizer(_PandasNormalizer):
         )
 
 
+_ALLOW_PICKLE_READS_ENV_VAR = "ARCTICDB_ALLOW_PICKLE_READS"
+# None => defer to the environment variable. Set explicitly via set_allow_pickle_reads().
+_allow_pickle_reads_override = None
+
+
+def set_allow_pickle_reads(allow):
+    """Control whether ArcticDB is allowed to unpickle stored symbols/metadata on read.
+
+    Reading a pickled symbol or user-defined metadata deserializes it with ``pickle.load``,
+    which executes arbitrary code embedded in the stored bytes. A writer to shared storage
+    could therefore plant a payload that runs in the reader's process (remote code execution),
+    so this is disabled by default and reading such a payload raises ``UnsafePickleReadError``.
+
+    Enable this only if you trust every writer to the libraries you read.
+
+    :param allow: ``True``/``False`` to force enable/disable, or ``None`` to defer to the
+        ``ARCTICDB_ALLOW_PICKLE_READS`` environment variable.
+    """
+    global _allow_pickle_reads_override
+    _allow_pickle_reads_override = None if allow is None else bool(allow)
+
+
+def _env_allows_pickle_reads():
+    val = os.environ.get(_ALLOW_PICKLE_READS_ENV_VAR)
+    if val is None:
+        return False
+    return val.strip().lower() in ("1", "true", "yes", "on")
+
+
+def allow_pickle_reads():
+    """Return whether unpickling stored data on read is currently permitted."""
+    if _allow_pickle_reads_override is not None:
+        return _allow_pickle_reads_override
+    return _env_allows_pickle_reads()
+
+
 class MsgPackNormalizer(Normalizer):
     """
     Fall back plan for the time being to store arbitrary data
@@ -1374,6 +1411,8 @@ class MsgPackNormalizer(Normalizer):
 
     def __init__(self, cfg=None):
         self.strict_mode = cfg.strict_mode if cfg is not None else False
+        # None => defer to the global allow_pickle_reads() setting.
+        self.allow_pickle_reads = None
 
     def normalize(self, obj, **kwargs):
         disallow_pickle = kwargs.get("disallow_pickle", None)
@@ -1444,16 +1483,34 @@ class MsgPackNormalizer(Normalizer):
             return pd.Timedelta(data).to_pytimedelta()
 
         if code == MsgPackSerialization.PY_PICKLE_2:
+            self._check_pickle_read_allowed()
             # If stored in Python2 we want to use raw while unpacking.
             # https://github.com/msgpack/msgpack-python/blob/master/msgpack/_unpacker.pyx#L230
             data = unpackb(data, raw=True)
             return Pickler.read(data)
 
         if code == MsgPackSerialization.PY_PICKLE_3:
+            self._check_pickle_read_allowed()
             data = unpackb(data, raw=False)
             return Pickler.read(data)
 
         return ExtType(code, data)
+
+    def _pickle_reads_allowed(self):
+        # Instance override takes priority, otherwise defer to the global setting.
+        return self.allow_pickle_reads if self.allow_pickle_reads is not None else allow_pickle_reads()
+
+    def _check_pickle_read_allowed(self):
+        if not self._pickle_reads_allowed():
+            raise UnsafePickleReadError(
+                "Refusing to unpickle stored data on read because pickle reads are disabled. "
+                "This payload was stored as a pickle (e.g. a pickled symbol or user-defined "
+                "metadata) and decoding it would execute arbitrary code embedded in the stored "
+                "bytes, which is a remote code execution risk if any untrusted writer can reach "
+                "the storage. If you trust every writer to this library, enable pickle reads via "
+                "arcticdb.set_allow_pickle_reads(True) or by setting the "
+                f"{_ALLOW_PICKLE_READS_ENV_VAR}=1 environment variable."
+            )
 
     def _should_disallow_pickle(self, disallow_pickle):
         # `disallow_pickle` set by function parameter, has priority

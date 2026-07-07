@@ -128,6 +128,17 @@ ArcticDB is only able to store the following data types natively:
 Note that ArcticDB cannot efficiently store custom Python objects, even if inserted into a Pandas DataFrames/NumPy array. 
 Pickled data cannot be index or column-sliced, and neither `update` nor `append` primitives will function on pickled data. 
 
+!!! warning "Reading pickled data executes arbitrary code"
+
+    Reading a pickled symbol or pickled user-defined metadata deserializes it with Python's
+    `pickle`, which **executes arbitrary code embedded in the stored bytes**. Anyone who can write
+    to a library you read can therefore run code in your process (remote code execution). For this
+    reason ArcticDB **refuses to read pickled data by default** and raises `UnsafePickleReadError`.
+
+    Only enable pickle reads if you trust every writer to the libraries you read, via
+    `arcticdb.set_allow_pickle_reads(True)` or by setting the `ARCTICDB_ALLOW_PICKLE_READS=1`
+    environment variable. This does not affect reading natively-stored (non-pickled) data.
+
 ### *How does indexing work in ArcticDB?*
 
 See the [Getting Started](index.md#reading-and-writing-data) page for details of supported index types.
