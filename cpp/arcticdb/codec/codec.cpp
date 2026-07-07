@@ -80,7 +80,8 @@ class MetaBuffer {
 } // namespace
 
 std::optional<google::protobuf::Any> decode_metadata(
-        const SegmentHeader& hdr, const uint8_t*& data, const uint8_t* begin ARCTICDB_UNUSED
+        const SegmentHeader& hdr, const uint8_t*& data, const uint8_t* begin ARCTICDB_UNUSED,
+        const uint8_t* end = nullptr
 ) {
     if (hdr.has_metadata_field()) {
         hdr.metadata_field().validate();
@@ -89,7 +90,7 @@ std::optional<google::protobuf::Any> decode_metadata(
         std::optional<util::BitMagic> bv;
         ARCTICDB_DEBUG(log::codec(), "Decoding metadata at position {}: {}", data - begin, dump_bytes(data, 10));
         data += decode_ndarray(
-                meta_type_desc, hdr.metadata_field().ndarray(), data, meta_buf, bv, hdr.encoding_version()
+                meta_type_desc, hdr.metadata_field().ndarray(), data, meta_buf, bv, hdr.encoding_version(), end
         );
         ARCTICDB_TRACE(log::codec(), "Decoded metadata to position {}", data - begin);
         google::protobuf::io::ArrayInputStream ais(
@@ -105,9 +106,10 @@ std::optional<google::protobuf::Any> decode_metadata(
 }
 
 void decode_metadata(
-        const SegmentHeader& hdr, const uint8_t*& data, const uint8_t* begin ARCTICDB_UNUSED, SegmentInMemory& res
+        const SegmentHeader& hdr, const uint8_t*& data, const uint8_t* begin ARCTICDB_UNUSED, SegmentInMemory& res,
+        const uint8_t* end = nullptr
 ) {
-    auto maybe_any = decode_metadata(hdr, data, begin);
+    auto maybe_any = decode_metadata(hdr, data, begin, end);
     if (maybe_any) {
         ARCTICDB_TRACE(log::version(), "Found metadata on segment");
         res.set_metadata(std::move(*maybe_any));
@@ -129,7 +131,7 @@ std::optional<google::protobuf::Any> decode_metadata_from_segment(const Segment&
 }
 
 EncodedFieldCollection decode_encoded_fields(
-        const SegmentHeader& hdr, const uint8_t* data, const uint8_t* begin ARCTICDB_UNUSED
+        const SegmentHeader& hdr, const uint8_t* data, const uint8_t* begin ARCTICDB_UNUSED, const uint8_t* end
 ) {
     ARCTICDB_TRACE(log::codec(), "Decoding encoded fields");
 
@@ -141,7 +143,7 @@ EncodedFieldCollection decode_encoded_fields(
     const auto uncompressed_size = encoding_sizes::uncompressed_size(hdr.column_fields());
     constexpr auto type_desc = encoded_fields_type_desc();
     Column encoded_column(type_desc, uncompressed_size, AllocationType::DYNAMIC, Sparsity::NOT_PERMITTED);
-    decode_ndarray(type_desc, hdr.column_fields().ndarray(), data, encoded_column, bv, hdr.encoding_version());
+    decode_ndarray(type_desc, hdr.column_fields().ndarray(), data, encoded_column, bv, hdr.encoding_version(), end);
 
     ARCTICDB_TRACE(log::codec(), "Decoded encoded fields at position {}", data - begin);
     return {std::move(encoded_column.release_buffer()), std::move(encoded_column.release_shapes())};
@@ -154,14 +156,16 @@ std::shared_ptr<arcticdb::proto::descriptors::FrameMetadata> extract_frame_metad
     return output;
 }
 
-FrameDescriptorImpl read_frame_descriptor(const uint8_t*& data) {
+FrameDescriptorImpl read_frame_descriptor(const uint8_t*& data, const uint8_t* end = nullptr) {
+    util::check_buffer_bounds(data, sizeof(FrameDescriptorImpl), end, "frame descriptor");
     auto* frame_descriptor = reinterpret_cast<const FrameDescriptorImpl*>(data);
     data += sizeof(FrameDescriptorImpl);
     return *frame_descriptor;
 }
 
-SegmentDescriptorImpl read_segment_descriptor(const uint8_t*& data) {
-    util::check_magic<SegmentDescriptorMagic>(data);
+SegmentDescriptorImpl read_segment_descriptor(const uint8_t*& data, const uint8_t* end) {
+    util::check_magic<SegmentDescriptorMagic>(data, end);
+    util::check_buffer_bounds(data, sizeof(SegmentDescriptorImpl), end, "segment descriptor");
     auto* frame_descriptor = reinterpret_cast<const SegmentDescriptorImpl*>(data);
     data += sizeof(SegmentDescriptorImpl);
     return *frame_descriptor;
@@ -182,7 +186,8 @@ std::shared_ptr<FieldCollection> decode_index_fields(
                 data,
                 *fields,
                 bv,
-                hdr.encoding_version()
+                hdr.encoding_version(),
+                end
         );
 
         ARCTICDB_TRACE(log::codec(), "Decoded index descriptor to position {}", data - begin);
@@ -215,7 +220,9 @@ std::optional<FieldCollection> decode_descriptor_fields(
         util::check(data != end, "Reached end of input block with descriptor fields to decode");
         std::optional<util::BitMagic> bv;
         FieldCollection fields;
-        data += decode_field(FieldCollection::type(), hdr.descriptor_field(), data, fields, bv, hdr.encoding_version());
+        data += decode_field(
+                FieldCollection::type(), hdr.descriptor_field(), data, fields, bv, hdr.encoding_version(), end
+        );
 
         ARCTICDB_TRACE(log::codec(), "Decoded descriptor fields to position {}", data - begin);
         return std::make_optional<FieldCollection>(std::move(fields));
@@ -259,33 +266,37 @@ std::optional<TimeseriesDescriptor> decode_timeseries_descriptor_v1(
     return unpack_timeseries_descriptor_from_proto(*maybe_any, descriptor, false);
 }
 
-void skip_descriptor(const uint8_t*& data, const SegmentHeader& hdr) {
-    util::check_magic<SegmentDescriptorMagic>(data);
+void skip_descriptor(const uint8_t*& data, const SegmentHeader& hdr, const uint8_t* end = nullptr) {
+    util::check_magic<SegmentDescriptorMagic>(data, end);
+    util::check_buffer_bounds(data, sizeof(SegmentDescriptor), end, "segment descriptor");
     data += sizeof(SegmentDescriptor);
-    skip_identifier(data);
-    util::check_magic<DescriptorFieldsMagic>(data);
-    if (hdr.has_descriptor_field() && hdr.descriptor_field().has_ndarray())
-        data += encoding_sizes::field_compressed_size(hdr.descriptor_field());
+    skip_identifier(data, end);
+    util::check_magic<DescriptorFieldsMagic>(data, end);
+    if (hdr.has_descriptor_field() && hdr.descriptor_field().has_ndarray()) {
+        const auto field_size = encoding_sizes::field_compressed_size(hdr.descriptor_field());
+        util::check_buffer_bounds(data, field_size, end, "descriptor fields");
+        data += field_size;
+    }
 }
 
 std::optional<TimeseriesDescriptor> decode_timeseries_descriptor_v2(
         const SegmentHeader& hdr, const uint8_t* data, const uint8_t* begin, const uint8_t* end
 ) {
-    util::check_magic<MetadataMagic>(data);
+    util::check_magic<MetadataMagic>(data, end);
 
-    auto maybe_any = decode_metadata(hdr, data, begin);
+    auto maybe_any = decode_metadata(hdr, data, begin, end);
     if (!maybe_any)
         return std::nullopt;
 
     auto frame_meta =
             std::make_shared<arcticdb::proto::descriptors::FrameMetadata>(frame_metadata_from_any(*maybe_any));
 
-    skip_descriptor(data, hdr);
+    skip_descriptor(data, hdr, end);
 
-    util::check_magic<IndexMagic>(data);
-    auto frame_desc = std::make_shared<FrameDescriptorImpl>(read_frame_descriptor(data));
-    auto segment_desc = std::make_shared<SegmentDescriptorImpl>(read_segment_descriptor(data));
-    auto segment_id = read_identifier(data);
+    util::check_magic<IndexMagic>(data, end);
+    auto frame_desc = std::make_shared<FrameDescriptorImpl>(read_frame_descriptor(data, end));
+    auto segment_desc = std::make_shared<SegmentDescriptorImpl>(read_segment_descriptor(data, end));
+    auto segment_id = read_identifier(data, end);
     auto index_fields = decode_index_fields(hdr, data, begin, end);
     return std::make_optional<TimeseriesDescriptor>(
             frame_desc, segment_desc, frame_meta, std::move(index_fields), segment_id
@@ -376,7 +387,8 @@ void decode_string_pool(
                 data,
                 res.string_pool(),
                 bv,
-                hdr.encoding_version()
+                hdr.encoding_version(),
+                end
         );
         timer.end();
         log::codec().debug("Decoded string pool to position {} in {}s", data - begin, timer.get_results_total());
@@ -404,18 +416,20 @@ void decode_v2(const Segment& segment, const SegmentHeader& hdr, SegmentInMemory
     }
 
     const auto [begin, end] = get_segment_begin_end(segment, hdr);
+    // `end` bounds the segment body; the encoded fields footer lives between `end` and the buffer end.
+    const auto buffer_end = begin + segment.buffer().bytes();
     auto encoded_fields_ptr = end;
     auto data = begin;
-    util::check_magic<MetadataMagic>(data);
-    decode_metadata(hdr, data, begin, res);
-    skip_descriptor(data, hdr);
+    util::check_magic<MetadataMagic>(data, end);
+    decode_metadata(hdr, data, begin, res, end);
+    skip_descriptor(data, hdr, end);
 
-    util::check_magic<IndexMagic>(data);
+    util::check_magic<IndexMagic>(data, end);
     if (hdr.has_index_descriptor_field()) {
-        auto index_frame_descriptor = std::make_shared<FrameDescriptorImpl>(read_frame_descriptor(data));
+        auto index_frame_descriptor = std::make_shared<FrameDescriptorImpl>(read_frame_descriptor(data, end));
         auto frame_metadata = extract_frame_metadata(res);
-        auto index_segment_descriptor = std::make_shared<SegmentDescriptorImpl>(read_segment_descriptor(data));
-        auto index_segment_identifier = read_identifier(data);
+        auto index_segment_descriptor = std::make_shared<SegmentDescriptorImpl>(read_segment_descriptor(data, end));
+        auto index_segment_identifier = read_identifier(data, end);
         auto index_fields = decode_index_fields(hdr, data, begin, end);
         TimeseriesDescriptor tsd{
                 std::move(index_frame_descriptor),
@@ -430,8 +444,8 @@ void decode_v2(const Segment& segment, const SegmentHeader& hdr, SegmentInMemory
 
     if (data != end) {
         util::check(hdr.has_column_fields(), "Expected column fields in v2 encoding");
-        util::check_magic<EncodedMagic>(encoded_fields_ptr);
-        auto encoded_fields_buffer = decode_encoded_fields(hdr, encoded_fields_ptr, begin);
+        util::check_magic<EncodedMagic>(encoded_fields_ptr, buffer_end);
+        auto encoded_fields_buffer = decode_encoded_fields(hdr, encoded_fields_ptr, begin, buffer_end);
         const auto fields_size = desc.fields().size();
         const auto start_row = res.row_count();
         EncodedFieldCollection encoded_fields(std::move(encoded_fields_buffer));
@@ -458,19 +472,22 @@ void decode_v2(const Segment& segment, const SegmentHeader& hdr, SegmentInMemory
                         data,
                         col,
                         col.opt_sparse_map(),
-                        hdr.encoding_version()
+                        hdr.encoding_version(),
+                        end
                 );
                 col.set_statistics(encoded_field->get_statistics());
 
                 seg_row_count = std::max(seg_row_count, calculate_last_row(col));
             } else {
-                data += encoding_sizes::field_compressed_size(*encoded_field) + sizeof(ColumnMagic);
+                const auto skip_bytes = encoding_sizes::field_compressed_size(*encoded_field) + sizeof(ColumnMagic);
+                util::check_buffer_bounds(data, skip_bytes, end, "skipped column");
+                data += skip_bytes;
             }
             ++encoded_field;
             ARCTICDB_TRACE(log::codec(), "V2 Decoded column {} to position {}", i, data - begin);
         }
 
-        util::check_magic<StringPoolMagic>(data);
+        util::check_magic<StringPoolMagic>(data, end);
         decode_string_pool(hdr, data, begin, end, res);
 
         res.set_row_data(static_cast<ssize_t>(start_row + seg_row_count));

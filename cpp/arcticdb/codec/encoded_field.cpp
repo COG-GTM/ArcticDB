@@ -16,6 +16,15 @@ std::pair<const uint8_t*, const uint8_t*> get_segment_begin_end(const Segment& s
     util::check(data != nullptr, "Got null data ptr from segment in get_segment_begin_end");
     const uint8_t* begin = data;
     const auto fields_offset = hdr.footer_offset();
+    const auto buffer_bytes = segment.buffer().bytes();
+    // footer_offset is read from the untrusted on-disk header; reject values that would place the body
+    // end past the segment buffer so downstream decode bounds checks operate on a valid range.
+    codec::check<ErrorCode::E_DECODE_ERROR>(
+            fields_offset <= buffer_bytes,
+            "Segment footer offset {} exceeds buffer size {}",
+            fields_offset,
+            buffer_bytes
+    );
     const auto end = begin + fields_offset;
     return {begin, end};
 }

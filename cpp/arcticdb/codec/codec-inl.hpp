@@ -23,10 +23,14 @@
 namespace arcticdb {
 
 template<typename T, typename BlockType>
-void decode_block(const BlockType& block, const std::uint8_t* input, T* output) {
+void decode_block(const BlockType& block, const std::uint8_t* input, T* output, const std::uint8_t* end = nullptr) {
     ARCTICDB_SUBSAMPLE_AGG(DecodeBlock)
     std::size_t size_to_decode = block.out_bytes();
     std::size_t decoded_size = block.in_bytes();
+
+    // The compressed block size comes from the untrusted on-disk header. Verify the block stays within
+    // the segment buffer before the decoders read `size_to_decode` bytes from `input`.
+    util::check_buffer_bounds(input, size_to_decode, end, "encoded block");
 
     if (!block.has_codec()) {
         arcticdb::detail::PassthroughDecoder::decode_block<T>(input, size_to_decode, output, decoded_size);
@@ -49,10 +53,11 @@ void decode_block(const BlockType& block, const std::uint8_t* input, T* output) 
 
 template<typename FieldType, class DataSink>
 inline void read_shapes(
-        FieldType& encoded_field, DataSink& data_sink, uint8_t const*& data_in, int shapes_block, shape_t*& shapes_out
+        FieldType& encoded_field, DataSink& data_sink, uint8_t const*& data_in, int shapes_block, shape_t*& shapes_out,
+        const std::uint8_t* end = nullptr
 ) {
     const auto& shape = encoded_field.shapes(shapes_block);
-    decode_block<shape_t>(shape, data_in, shapes_out);
+    decode_block<shape_t>(shape, data_in, shapes_out, end);
     data_in += shape.out_bytes();
     shapes_out += shape.in_bytes() / sizeof(shape_t);
     data_sink.advance_shapes(shape.in_bytes());
@@ -61,7 +66,7 @@ inline void read_shapes(
 template<class DataSink, typename NDArrayEncodedFieldType>
 std::size_t decode_ndarray(
         const TypeDescriptor& td, const NDArrayEncodedFieldType& field, const std::uint8_t* input, DataSink& data_sink,
-        std::optional<util::BitMagic>& bv, EncodingVersion encoding_version
+        std::optional<util::BitMagic>& bv, EncodingVersion encoding_version, const std::uint8_t* end = nullptr
 ) {
     ARCTICDB_SUBSAMPLE_AGG(DecodeNdArray)
 
@@ -113,7 +118,7 @@ std::size_t decode_ndarray(
             if (shape_size > 0) {
                 shapes_out = data_sink.allocate_shapes(shape_size);
                 if (encoding_version == EncodingVersion::V2)
-                    read_shapes(field, data_sink, data_in, 0, shapes_out);
+                    read_shapes(field, data_sink, data_in, 0, shapes_out, end);
             }
         }
         for (auto block_num = 0; block_num < num_blocks; ++block_num) {
@@ -121,14 +126,14 @@ std::size_t decode_ndarray(
                 // In V1 encoding each block of values is preceded by a block of shapes.
                 // In V2 encoding all shapes are put in a single block placed at the beginning of the block chain.
                 if (encoding_version == EncodingVersion::V1) {
-                    read_shapes(field, data_sink, data_in, block_num, shapes_out);
+                    read_shapes(field, data_sink, data_in, block_num, shapes_out, end);
                 }
             }
 
             const auto& block_info = field.values(block_num);
             ARCTICDB_TRACE(log::codec(), "Decoding block {} at pos {}", block_num, data_in - input);
             size_t block_inflated_size;
-            decode_block<T>(block_info, data_in, reinterpret_cast<T*>(data_out));
+            decode_block<T>(block_info, data_in, reinterpret_cast<T*>(data_out), end);
             block_inflated_size = block_info.in_bytes();
             data_out += block_inflated_size;
             data_sink.advance_data(block_inflated_size);
@@ -137,10 +142,11 @@ std::size_t decode_ndarray(
 
         if (field.sparse_map_bytes()) {
             util::check(!is_empty_type(type_desc_tag.data_type()), "Empty typed columns should not have sparse map");
-            util::check_magic<util::BitMagicStart>(data_in);
+            util::check_magic<util::BitMagicStart>(data_in, end);
             const auto bitmap_size = field.sparse_map_bytes() - util::combined_bit_magic_delimiters_size();
+            util::check_buffer_bounds(data_in, bitmap_size, end, "sparse bitmap");
             bv = util::deserialize_bytes_to_bitmap(data_in, bitmap_size);
-            util::check_magic<util::BitMagicEnd>(data_in);
+            util::check_magic<util::BitMagicEnd>(data_in, end);
             data_sink.set_allow_sparse(Sparsity::PERMITTED);
         }
 
@@ -165,17 +171,17 @@ std::size_t decode_ndarray(
 template<class DataSink>
 std::size_t decode_field(
         const TypeDescriptor& td, const EncodedFieldImpl& field, const std::uint8_t* input, DataSink& data_sink,
-        std::optional<util::BitMagic>& bv, EncodingVersion encoding_version
+        std::optional<util::BitMagic>& bv, EncodingVersion encoding_version, const std::uint8_t* end
 ) {
     size_t magic_size = 0u;
     if (encoding_version != EncodingVersion::V1) {
         magic_size += sizeof(ColumnMagic);
-        util::check_magic<ColumnMagic>(input);
+        util::check_magic<ColumnMagic>(input, end);
     }
 
     switch (field.encoding_case()) {
     case EncodedFieldType::NDARRAY:
-        return decode_ndarray(td, field.ndarray(), input, data_sink, bv, encoding_version) + magic_size;
+        return decode_ndarray(td, field.ndarray(), input, data_sink, bv, encoding_version, end) + magic_size;
     default:
         util::raise_rte("Unsupported encoding {}", field);
     }

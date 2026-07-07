@@ -9,6 +9,7 @@
 
 #include "arcticdb/storage/memory_layout.hpp"
 #include <arcticdb/entity/types.hpp>
+#include <arcticdb/util/magic_num.hpp>
 
 namespace arcticdb {
 
@@ -46,11 +47,13 @@ inline void write_identifier(Buffer& buffer, std::ptrdiff_t& pos, const StreamId
     );
 }
 
-inline StreamId read_identifier(const uint8_t*& data) {
+inline StreamId read_identifier(const uint8_t*& data, const uint8_t* end = nullptr) {
+    util::check_buffer_bounds(data, SegmentIdentifierSize, end, "segment identifier header");
     auto* identifier = reinterpret_cast<const SegmentIdentifier*>(data);
 
     switch (identifier->header_.type_) {
     case IdentifierType::STRING:
+        util::check_buffer_bounds(data, SegmentIdentifierSize + identifier->header_.size_, end, "segment identifier");
         data += SegmentIdentifierSize + identifier->header_.size_;
         return StringId(&identifier->data_[0], identifier->header_.size_);
     case IdentifierType::NUMERIC:
@@ -61,10 +64,12 @@ inline StreamId read_identifier(const uint8_t*& data) {
     }
 }
 
-inline void skip_identifier(const uint8_t*& data) {
+inline void skip_identifier(const uint8_t*& data, const uint8_t* end = nullptr) {
+    util::check_buffer_bounds(data, SegmentIdentifierSize, end, "segment identifier header");
     auto* identifier = reinterpret_cast<const SegmentIdentifier*>(data);
     switch (identifier->header_.type_) {
     case IdentifierType::STRING:
+        util::check_buffer_bounds(data, SegmentIdentifierSize + identifier->header_.size_, end, "segment identifier");
         data += SegmentIdentifierSize + identifier->header_.size_;
         break;
     case IdentifierType::NUMERIC:
