@@ -441,9 +441,9 @@ def _pickle_reads_reset():
 
 
 def _pack_pickle_payload():
-    norm = MsgPackNormalizer()
-    norm.allow_pickle_reads = True
-    return norm._msgpack_packb(errors.BoundaryError("bananas"))
+    # Packing (write) is gated by strict_mode/disallow_pickle only, both off here, so this
+    # pickles regardless of the read-side allow_pickle_reads flag.
+    return MsgPackNormalizer()._msgpack_packb(errors.BoundaryError("bananas"))
 
 
 def test_read_pickle_disabled_by_default(monkeypatch, _pickle_reads_reset):
