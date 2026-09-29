@@ -211,6 +211,12 @@ def _pandas_infers_str_dtype():
         return False
 
 
+def _is_string_coerce_type(coerce_column_type):
+    return (
+        coerce_column_type is None or coerce_column_type in OBJECT_TOKENS or _accept_array_string(coerce_column_type())
+    )
+
+
 def _is_object_or_empty(arr):
     return arr.dtype == object or len(arr) == 0
 
@@ -629,8 +635,9 @@ def _normalize_columns(
                 len(columns_names_norm), len(columns_vals)
             )
         )
-    for name, vals in zip(columns_names_norm, columns_vals):
-        if _is_str_dtype(vals.dtype):
+    coerce_column_types = [coerce_columns[str(name)] if coerce_columns else None for name in columns_names]
+    for name, vals, coerce_column_type in zip(columns_names_norm, columns_vals, coerce_column_types):
+        if _is_str_dtype(vals.dtype) and _is_string_coerce_type(coerce_column_type):
             norm_meta.common.str_dtype_columns.append(name)
     column_vals = [
         _to_primitive(
@@ -638,7 +645,7 @@ def _normalize_columns(
             columns_names_norm[idx],
             string_max_len=string_max_len,
             dynamic_strings=dynamic_strings,
-            coerce_column_type=coerce_columns[str(columns_names[idx])] if coerce_columns else None,
+            coerce_column_type=coerce_column_types[idx],
             norm_meta=norm_meta,
         )
         for idx in range(len(columns_names_norm))

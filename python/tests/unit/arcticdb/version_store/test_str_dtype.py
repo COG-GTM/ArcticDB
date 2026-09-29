@@ -209,3 +209,29 @@ def test_str_column_with_fixed_width_strings(lmdb_version_store_string_coercion,
     result = lib.read("sym").data
     assert result["a"].dtype == STR_DTYPE
     assert_frame_equal(result, df)
+
+
+def test_append_without_existing_str_column(lmdb_version_store_dynamic_schema_v1, infer_string):
+    lib = lmdb_version_store_dynamic_schema_v1
+    df_1 = pd.DataFrame(
+        {"a": pd.array(["x", "y"], dtype=STR_DTYPE), "b": [1, 2]},
+        index=pd.date_range("2025-01-01", periods=2, unit="ns"),
+    )
+    df_2 = pd.DataFrame({"b": [3, 4]}, index=pd.date_range("2025-01-03", periods=2, unit="ns"))
+    lib.write("sym", df_1)
+    lib.append("sym", df_2)
+    result = lib.read("sym").data
+    assert result["a"].dtype == STR_DTYPE
+    assert result["a"].tolist()[:2] == ["x", "y"]
+    assert result["a"].isna().tolist() == [False, False, True, True]
+
+
+def test_str_column_coerced_to_float(lmdb_version_store, infer_string):
+    lib = lmdb_version_store
+    df = pd.DataFrame({"a": pd.array(["1.5", "2.5"], dtype=STR_DTYPE), "b": pd.array(["x", "y"], dtype=STR_DTYPE)})
+    lib.write("sym", df, coerce_columns={"a": float, "b": str})
+    result = lib.read("sym").data
+    assert list(lib.get_info("sym")["normalization_metadata"].df.common.str_dtype_columns) == ["b"]
+    assert result["a"].dtype.kind == "f"
+    assert result["a"].tolist() == [1.5, 2.5]
+    assert result["b"].dtype == STR_DTYPE

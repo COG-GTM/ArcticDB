@@ -71,6 +71,24 @@ std::pair<index::IndexSegmentReader, std::vector<SliceAndKey>> read_index_to_vec
     return {std::move(index_segment_reader), std::move(slice_and_keys)};
 }
 
+namespace {
+// Keeps the pandas `str` dtype of existing columns which are not present in the new frame
+void merge_str_dtype_columns(
+        const proto::descriptors::NormalizationMetadata& existing_norm_meta, const StreamDescriptor& new_descriptor,
+        proto::descriptors::NormalizationMetadata& new_norm_meta
+) {
+    if (!existing_norm_meta.has_df() || !new_norm_meta.has_df()) {
+        return;
+    }
+    auto* new_common = new_norm_meta.mutable_df()->mutable_common();
+    for (const auto& name : existing_norm_meta.df().common().str_dtype_columns()) {
+        if (!new_descriptor.find_field(name).has_value()) {
+            new_common->add_str_dtype_columns(name);
+        }
+    }
+}
+} // namespace
+
 TimeseriesDescriptor get_merged_tsd(
         size_t row_count, bool dynamic_schema, const TimeseriesDescriptor& existing_tsd,
         const std::shared_ptr<pipelines::InputFrame>& new_frame
@@ -84,6 +102,7 @@ TimeseriesDescriptor get_merged_tsd(
         // In case of dynamic schema
         const std::array fields_ptr = {new_frame->desc_for_tsd().fields_ptr()};
         merged_descriptor = merge_descriptors(existing_descriptor, fields_ptr, {});
+        merge_str_dtype_columns(existing_tsd.normalization(), new_frame->desc_for_tsd(), new_frame->norm_meta);
     } else {
         // In case of static schema, we only promote empty types and fixed->dynamic strings
         const auto& new_fields = new_frame->desc_for_tsd().fields();
