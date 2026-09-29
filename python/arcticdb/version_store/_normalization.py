@@ -187,6 +187,34 @@ def _is_nat(element):
     return isinstance(element, type(pd.NaT)) and pd.isna(element)
 
 
+def _get_str_dtype():
+    # The pandas `str` dtype, i.e. `StringDtype` with NaN as its missing value. It is available as of pandas 2.3 and is
+    # the default dtype inferred for strings as of pandas 3.
+    try:
+        return pd.StringDtype(na_value=np.nan)
+    except (AttributeError, TypeError):
+        return None
+
+
+_STR_DTYPE = _get_str_dtype()
+
+
+def _is_str_dtype(dtype):
+    return _STR_DTYPE is not None and isinstance(dtype, pd.StringDtype) and _is_nan(dtype.na_value)
+
+
+def _pandas_infers_str_dtype():
+    # True if pandas infers the `str` dtype for arrays of strings, which is the default as of pandas 3
+    try:
+        return bool(pd.get_option("future.infer_string"))
+    except KeyError:
+        return False
+
+
+def _is_object_or_empty(arr):
+    return arr.dtype == object or len(arr) == 0
+
+
 def get_sample_from_non_empty_arr(arr, arr_name):
     for element in arr:
         if element is None:
@@ -238,6 +266,10 @@ def _to_primitive(arr, arr_name, dynamic_strings, string_max_len=None, coerce_co
             "If you are interested in the support of PyArrow-backed pandas DataFrame and Series, please upvote this \n"
             "GitHub issue and participate to its discussions: https://github.com/man-group/ArcticDB/issues/881"
         )
+
+    if _is_str_dtype(arr.dtype):
+        # The `str` dtype represents all missing values as NaN, so this is an object array of Python strings and NaNs
+        arr = arr.to_numpy(dtype=object)
 
     if isinstance(arr.dtype, pd.core.dtypes.dtypes.CategoricalDtype):
         if is_integer_dtype(arr.categories.dtype):
@@ -393,6 +425,8 @@ def _normalize_single_index(
         return [], []
     else:
         coerce_type = DTN64_DTYPE if len(index) == 0 else None
+        if _is_str_dtype(index.dtype):
+            index_norm.is_str_dtype = True
         index_vals = index
         if not isinstance(index, np.ndarray):
             index_vals = index.values
@@ -467,7 +501,15 @@ def _denormalize_single_index(item, norm_meta):
 
     if len(item.index_columns) == 1:
         name = int(item.index_columns[0]) if norm_meta.index.is_int else item.index_columns[0]
-        rtn = Index(item.data[0] if len(item.data) > 0 else [], name=name)
+        index_data = item.data[0] if len(item.data) > 0 else []
+        index_dtype = None
+        if isinstance(index_data, np.ndarray) and _is_object_or_empty(index_data):
+            if _STR_DTYPE is not None and (norm_meta.index.is_str_dtype or norm_meta.multi_index.is_str_dtype):
+                index_dtype = _STR_DTYPE
+            elif index_data.dtype == object and _pandas_infers_str_dtype():
+                # Preserve object dtype (and None values) for indexes which were not written with the `str` dtype
+                index_dtype = object
+        rtn = Index(index_data, name=name, dtype=index_dtype)
 
         tz = get_timezone_from_metadata(norm_meta)
         if isinstance(rtn, DatetimeIndex) and tz:
@@ -587,6 +629,9 @@ def _normalize_columns(
                 len(columns_names_norm), len(columns_vals)
             )
         )
+    for name, vals in zip(columns_names_norm, columns_vals):
+        if _is_str_dtype(vals.dtype):
+            norm_meta.common.str_dtype_columns.append(name)
     column_vals = [
         _to_primitive(
             columns_vals[idx],
@@ -965,6 +1010,10 @@ class _PandasNormalizer(Normalizer):
                     names.append("{}{}".format(_IDX_PREFIX, index.names[f]))
             df.index.names = names
             df.reset_index(fields, inplace=True)
+            for position, f in enumerate(fields):
+                # `reset_index` infers the `str` dtype for `object` levels of strings when pandas infers strings as `str`
+                if index.levels[f].dtype == object and _is_str_dtype(df.iloc[:, position].dtype):
+                    df.isetitem(position, df.iloc[:, position].astype(object))
             index = df.index
         else:
             index_norm = pd_norm.index
@@ -1169,8 +1218,21 @@ class DataFrameNormalizer(_PandasNormalizer):
         idx_type = norm_meta.common.WhichOneof("index_type")
 
         columns, denormed_columns, data = _denormalize_columns(item, norm_meta, idx_type, n_indexes)
+        str_dtype_columns = set(norm_meta.common.str_dtype_columns)
 
         if not self._skip_df_consolidation:
+            if data is not None and _pandas_infers_str_dtype():
+                # Preserve object dtype (and None values) for string columns which were not written with the `str` dtype
+                data = {
+                    column: (
+                        pd.Series(arr, index=index, dtype=object, copy=False)
+                        if isinstance(arr, np.ndarray)
+                        and arr.dtype == object
+                        and item.names[position] not in str_dtype_columns
+                        else arr
+                    )
+                    for position, (column, arr) in enumerate(data.items())
+                }
             df = DataFrame(data, index=index, columns=columns)
             # Setting the columns' dtype manually, since pandas might just convert the dtype of some
             # (empty) columns to another one and since the `dtype` keyword for `pd.DataFrame` constructor
@@ -1206,6 +1268,11 @@ class DataFrameNormalizer(_PandasNormalizer):
                 df = self.df_without_consolidation(columns, index, item, n_indexes, data)
             else:
                 df = self.df_without_consolidation(columns, item.data[0], item, n_indexes, data)
+
+        if str_dtype_columns and _STR_DTYPE is not None:
+            for position, name in enumerate(item.names):
+                if name in str_dtype_columns and _is_object_or_empty(df.iloc[:, position]):
+                    df.isetitem(position, df.iloc[:, position].astype(_STR_DTYPE))
 
         if denormed_columns is not None:
             df.columns = denormed_columns
@@ -1285,7 +1352,17 @@ class DataFrameNormalizer(_PandasNormalizer):
             df = df.iloc[:, midx.field_count :]
             df.index = index
         else:
+            object_levels = [
+                index_level_num
+                for index_level_num, dtype in enumerate(df.dtypes.iloc[: midx.field_count], start=1)
+                if dtype == object
+            ]
             df.set_index(list(df.columns[: midx.field_count]), append=True, inplace=True)
+            for index_level_num in object_levels:
+                # `set_index` infers the `str` dtype for `object` columns of strings when pandas infers strings as `str`
+                level = df.index.levels[index_level_num]
+                if _is_str_dtype(level.dtype):
+                    df.index = df.index.set_levels(level.astype(object), level=index_level_num)
 
             # Restore the timezones in all but the first index which is fixed in _index_from_records.
             for key in midx.timezone:

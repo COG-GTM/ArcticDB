@@ -235,5 +235,7 @@ See also [error codes 7002 and 7003](error_messages.md#user-input-errors) for th
 The handling of `NaN` in ArcticDB depends on the type of the column under consideration:
 
 * For string columns, `NaN`, as well as Python `None`, are fully supported.
+  * For `object` dtype string columns, `NaN` and `None` are preserved as written. Note that `pd.NA` is not supported in `object` dtype string columns.
+  * For columns with the pandas `str` dtype (`pd.StringDtype(na_value=np.nan)`, the default dtype for strings as of pandas 3), pandas stores every missing value (`NaN`, `None` or `pd.NA`) as `NaN`, so missing values are read back as `NaN`. These columns are read back with the `str` dtype when using pandas >= 2.3.
 * For floating-point numeric columns, `NaN` is also fully supported.
 * For integer numeric columns `NaN` is not supported. A column that otherwise contains only integers will be treated as a floating point column if a `NaN` is encountered by ArcticDB, at which point [the usual rules](api/arctic.md#arcticdb.LibraryOptions) around type promotion for libraries configured with or without dynamic schema all apply as usual.

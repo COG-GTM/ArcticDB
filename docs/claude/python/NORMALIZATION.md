@@ -71,6 +71,7 @@ pandas.DataFrame
 | `bool` | `BOOL8` |
 | `datetime64[ns]` | `NANOSECONDS_UTC64` |
 | `object` (strings) | `UTF_DYNAMIC64` |
+| `str` (pandas 3 default strings) | `UTF_DYNAMIC64` |
 | `category` | Underlying type |
 
 ### Index Handling
@@ -132,6 +133,14 @@ df = pd.DataFrame({"name": ["Alice", "Bob", "Charlie"]})
 lib.write("symbol", df)
 # Strings stored efficiently with actual lengths
 ```
+
+### pandas `str` dtype
+
+pandas 3 infers strings as the `str` dtype (`pd.StringDtype(na_value=np.nan)`) instead of `object`.
+
+- Write: `_to_primitive` converts `str` arrays to `object` arrays of Python strings and `NaN`, so the C++ string path is unchanged. `_normalize_columns` records the normalized names of `str` columns in `Pandas.str_dtype_columns`; `_normalize_single_index` sets `PandasIndex.is_str_dtype` / `PandasMultiIndex.is_str_dtype` (first level).
+- Read: `DataFrameNormalizer.denormalize` and `_denormalize_single_index` restore `str` for recorded columns/indexes (pandas >= 2.3). When pandas infers `str` (`future.infer_string`), other `object` string data is kept as `object` so `None` values and the dtype are preserved.
+- Missing values: all missing values in a `str` column are `NaN` (pandas normalizes `None`/`pd.NA` on construction). `object` columns keep the `None`/`NaN` distinction.
 
 ### Fixed-Length Strings
 

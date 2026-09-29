@@ -130,6 +130,7 @@ message NormalizationMetadata {
         int64 start = 5; // Used for RangeIndex
         int64 step = 6; // Used for RangeIndex
         bool is_int = 7;
+        bool is_str_dtype = 8; // True if the index was written with the pandas `str` dtype
     }
 
     message PandasMultiIndex {
@@ -140,6 +141,7 @@ message NormalizationMetadata {
         string tz = 5;
         repeated uint32 fake_field_pos = 6;
         bool is_int = 7;
+        bool is_str_dtype = 8; // True if the first index level was written with the pandas `str` dtype
     }
 
     message PandasMultiColumn {
@@ -192,7 +194,9 @@ message NormalizationMetadata {
 
         map<string, ColumnName> col_names = 7;
         PandasIndex columns = 8;
-        // Note that 9 is taken above by has_name, so the next added field should be 10
+        // Note that 9 is taken above by has_name
+        // Normalized names of the columns written with the pandas `str` dtype (StringDtype with NaN missing values)
+        repeated string str_dtype_columns = 10;
     }
 
     message PandasDataFrame {
