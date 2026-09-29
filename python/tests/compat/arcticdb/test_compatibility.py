@@ -65,6 +65,34 @@ def test_compat_write_read(old_venv_and_arctic_uri, lib_name, any_output_format)
             assert_frame_equal_with_arrow(read_df, df_2)
 
 
+@pytest.mark.skipif(
+    version.parse(pd.__version__) < version.parse("2.3"), reason="The pandas `str` dtype requires pandas >= 2.3"
+)
+def test_compat_str_dtype_columns(old_venv_and_arctic_uri, lib_name):
+    old_venv, arctic_uri = old_venv_and_arctic_uri
+    with CompatLibrary(old_venv, arctic_uri, lib_name) as compat:
+        sym = "sym"
+        df = pd.DataFrame(
+            {
+                "str_col": pd.array(["a", None, "c"], dtype=pd.StringDtype(na_value=np.nan)),
+                "obj_col": pd.Series(["x", "y", "z"], dtype=object),
+            }
+        )
+        df_2 = pd.DataFrame({"str_col": pd.Series(["d", "e"], dtype=object)})
+
+        with compat.current_version() as curr:
+            curr.lib.write(sym, df)
+
+        # Older versions ignore the `str` dtype metadata and read `str` columns as `object`
+        compat.old_lib.assert_read(sym, df.astype({"str_col": object}))
+
+        compat.old_lib.write(sym, df_2)
+
+        # Data written by older versions has no `str` dtype metadata and is read as `object`
+        with compat.current_version() as curr:
+            assert_frame_equal(curr.lib.read(sym).data, df_2)
+
+
 def test_modify_old_library_option_with_current(old_venv_and_arctic_uri, lib_name):
     old_venv, arctic_uri = old_venv_and_arctic_uri
     with CompatLibrary(old_venv, arctic_uri, lib_name) as compat:
