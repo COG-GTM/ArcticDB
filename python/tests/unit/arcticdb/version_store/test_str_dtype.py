@@ -235,3 +235,11 @@ def test_str_column_coerced_to_float(lmdb_version_store, infer_string):
     assert result["a"].dtype.kind == "f"
     assert result["a"].tolist() == [1.5, 2.5]
     assert result["b"].dtype == STR_DTYPE
+
+
+def test_empty_str_column_coerced_to_float(lmdb_version_store, infer_string):
+    lib = lmdb_version_store
+    df = pd.DataFrame({"a": pd.array([], dtype=STR_DTYPE)})
+    lib.write("sym", df, coerce_columns={"a": "float"})
+    assert list(lib.get_info("sym")["normalization_metadata"].df.common.str_dtype_columns) == []
+    assert lib.read("sym").data["a"].dtype != STR_DTYPE

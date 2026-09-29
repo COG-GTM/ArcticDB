@@ -212,9 +212,13 @@ def _pandas_infers_str_dtype():
 
 
 def _is_string_coerce_type(coerce_column_type):
-    return (
-        coerce_column_type is None or coerce_column_type in OBJECT_TOKENS or _accept_array_string(coerce_column_type())
-    )
+    if coerce_column_type is None:
+        return True
+    try:
+        dtype = pd.api.types.pandas_dtype(coerce_column_type)
+    except TypeError:
+        return False
+    return dtype.kind in "OSU"
 
 
 def _is_object_or_empty(arr):
