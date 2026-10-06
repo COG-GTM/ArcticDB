@@ -228,7 +228,7 @@ def gen_random_date(start: pd.Timestamp, end: pd.Timestamp):
 
 
 @SANITIZER_TESTS_MARK
-def test_mem_leak_read_all_arctic_lib(arctic_library_lmdb_100gb):
+def test_mem_leak_write_and_read_all_arctic_lib_100gb(arctic_library_lmdb_100gb):
     lib: adb.Library = arctic_library_lmdb_100gb
 
     df = generate_big_dataframe()
