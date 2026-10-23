@@ -17,3 +17,7 @@ Acceptance: `ruff check --select F811 python/` is clean; `pytest --collect-only`
 ## Log
 
 - Froze the resolution contract above.
+- WS1: renamed the all-`None` `TestCanUpdateEmptyColumn.test_bool` to `test_all_none`, reviving the `boolean_dtype` `test_bool`.
+- WS2: deleted the first (identical) `test_update_date_range_non_pandas_dataframe`.
+- WS3: renamed the first mem-leak test to `test_mem_leak_write_and_read_all_arctic_lib`; dropped duplicate `pytest`/`gc`/`time`/`pd` imports.
+- WS4: removed the remaining duplicate imports so `ruff check --select F811 python/` is clean.
