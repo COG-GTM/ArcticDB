@@ -1,6 +1,5 @@
 import arcticdb
 from arcticdb.util.test import random_strings_of_length, random_string
-import datetime
 import pandas as pd
 from datetime import datetime
 from pandas.testing import assert_frame_equal
