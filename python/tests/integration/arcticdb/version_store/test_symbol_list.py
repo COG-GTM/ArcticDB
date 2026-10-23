@@ -25,7 +25,6 @@ from arcticdb_ext.tools import CompactionId, CompactionLockName
 from arcticdb_ext.exceptions import InternalException, PermissionException
 
 from multiprocessing import Pool
-from arcticdb_ext import set_config_int
 from tests.util.mark import MACOS, REAL_AZURE_TESTS_MARK
 
 

@@ -13,7 +13,6 @@ from arcticc.pb2.storage_pb2 import EnvironmentConfigsMap, LibraryConfig, Librar
 from arcticdb.config import _DEFAULT_ENV
 from arcticdb.version_store._store import NativeVersionStore
 from arcticdb.options import DEFAULT_ENCODING_VERSION, LibraryOptions, EnterpriseLibraryOptions
-from arcticc.pb2.storage_pb2 import LibraryConfig
 from arcticdb_ext.storage import Library, StorageOverride, CONFIG_LIBRARY_NAME
 from arcticdb.encoding_version import EncodingVersion
 

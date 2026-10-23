@@ -42,7 +42,6 @@ from tests.util.mark import (
     MONGO_TESTS_MARK,
     REAL_S3_TESTS_MARK,
     SSL_TEST_SUPPORTED,
-    SSL_TEST_SUPPORTED,
 )
 from tests.util.marking import marks
 from tests.util.storage_test import get_s3_storage_config
