@@ -22,7 +22,7 @@ void add_serialization_fields(KeySegmentPair& kv) {
     (void)segment.calculate_size();
     if (hdr.encoding_version() == EncodingVersion::V2) {
         const auto* src = segment.buffer().data();
-        set_body_fields(hdr, src);
+        set_body_fields(hdr, src, src + segment.buffer().bytes());
     }
 }
 

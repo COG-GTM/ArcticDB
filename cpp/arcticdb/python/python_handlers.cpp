@@ -22,8 +22,8 @@ static PyObject** fill_with_none(ChunkedBuffer& buffer, size_t offset, size_t co
 }
 
 void PythonEmptyHandler::handle_type(
-        const uint8_t*& input, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& mapping,
-        const DecodePathData&, std::any& handler_data, EncodingVersion encoding_version,
+        const uint8_t*& input, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+        const ColumnMapping& mapping, const DecodePathData&, std::any& handler_data, EncodingVersion encoding_version,
         const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
 ) {
     ARCTICDB_SAMPLE(HandleEmpty, 0)
@@ -36,8 +36,10 @@ void PythonEmptyHandler::handle_type(
     );
     static_assert(get_type_size(DataType::EMPTYVAL) == sizeof(PyObject*));
 
-    if (encoding_version == EncodingVersion::V2)
+    if (encoding_version == EncodingVersion::V2) {
+        check_encoded_bytes_in_bounds(input, sizeof(ColumnMagic), end, "column magic");
         util::check_magic<ColumnMagic>(input);
+    }
 
     if (field.encoding_case() == EncodedFieldType::NDARRAY) {
         const auto& ndarray_field = field.ndarray();
@@ -45,6 +47,7 @@ void PythonEmptyHandler::handle_type(
         util::check(num_blocks <= 1, "Unexpected number of empty type blocks: {}", num_blocks);
         for (auto block_num = 0; block_num < num_blocks; ++block_num) {
             const auto& block_info = ndarray_field.values(block_num);
+            check_encoded_bytes_in_bounds(input, block_info.out_bytes(), end, "empty type block");
             input += block_info.out_bytes();
         }
     } else {
@@ -98,9 +101,10 @@ void PythonEmptyHandler::default_initialize(
 }
 
 void PythonBoolHandler::handle_type(
-        const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& m,
-        const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
-        const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
+        const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+        const ColumnMapping& m, const DecodePathData& shared_data, std::any& handler_data,
+        EncodingVersion encoding_version, const std::shared_ptr<StringPool>& string_pool,
+        const ReadOptions& read_options
 ) {
     ARCTICDB_SAMPLE(HandleBool, 0)
     util::check(field.has_ndarray(), "Bool handler expected array");
@@ -113,7 +117,7 @@ void PythonBoolHandler::handle_type(
                    AllocationType::DYNAMIC,
                    Sparsity::PERMITTED);
     data += decode_field(
-            m.source_type_desc_, field, data, decoded_data, decoded_data.opt_sparse_map(), encoding_version
+            m.source_type_desc_, field, data, decoded_data, decoded_data.opt_sparse_map(), encoding_version, end
     );
     // Calling `set_row_data` should be done after `sparse_map` is modified by `decode_field`.
     // TODO: Refactor so that `last_logical_row` is inferred from sparse_map as described in #2932
@@ -165,9 +169,10 @@ void PythonBoolHandler::default_initialize(
 }
 
 void PythonStringHandler::handle_type(
-        const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& m,
-        const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
-        const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
+        const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+        const ColumnMapping& m, const DecodePathData& shared_data, std::any& handler_data,
+        EncodingVersion encoding_version, const std::shared_ptr<StringPool>& string_pool,
+        const ReadOptions& read_options
 ) {
     ARCTICDB_SAMPLE(PythonHandleString, 0)
     util::check(field.has_ndarray(), "String handler expected array");
@@ -188,7 +193,7 @@ void PythonStringHandler::handle_type(
     }();
 
     data += decode_field(
-            m.source_type_desc_, field, data, decoded_data, decoded_data.opt_sparse_map(), encoding_version
+            m.source_type_desc_, field, data, decoded_data, decoded_data.opt_sparse_map(), encoding_version, end
     );
     // Calling `set_row_data` should be done after `sparse_map` is modified by `decode_field`.
     // TODO: Refactor so that `last_logical_row` is inferred from sparse_map as described in #2932
@@ -231,14 +236,14 @@ void PythonStringHandler::default_initialize(
 }
 
 void PythonArrayHandler::handle_type(
-        const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& m,
-        const DecodePathData& shared_data, std::any& any, EncodingVersion encoding_version,
+        const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+        const ColumnMapping& m, const DecodePathData& shared_data, std::any& any, EncodingVersion encoding_version,
         const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
 ) {
     ARCTICDB_SAMPLE(HandleArray, 0)
     util::check(field.has_ndarray(), "Expected ndarray in array object handler");
     Column column{m.source_type_desc_, Sparsity::PERMITTED};
-    data += decode_field(m.source_type_desc_, field, data, column, column.opt_sparse_map(), encoding_version);
+    data += decode_field(m.source_type_desc_, field, data, column, column.opt_sparse_map(), encoding_version, end);
     // Calling `set_row_data` should be done after `sparse_map` is modified by `decode_field`.
     // TODO: Refactor so that `last_logical_row` is inferred from sparse_map as described in #2932
     column.set_row_data(static_cast<ssize_t>(m.num_rows_) - 1);

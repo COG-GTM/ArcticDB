@@ -17,9 +17,10 @@ namespace arcticdb {
 
 struct PythonEmptyHandler {
     void handle_type(
-            const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& m,
-            const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
-            const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
+            const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+            const ColumnMapping& m, const DecodePathData& shared_data, std::any& handler_data,
+            EncodingVersion encoding_version, const std::shared_ptr<StringPool>& string_pool,
+            const ReadOptions& read_options
     );
 
     [[nodiscard]] int type_size() const;
@@ -42,9 +43,10 @@ struct PythonEmptyHandler {
 
 struct PythonStringHandler {
     void handle_type(
-            const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& m,
-            const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
-            const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
+            const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+            const ColumnMapping& m, const DecodePathData& shared_data, std::any& handler_data,
+            EncodingVersion encoding_version, const std::shared_ptr<StringPool>& string_pool,
+            const ReadOptions& read_options
     );
 
     [[nodiscard]] int type_size() const;
@@ -67,9 +69,10 @@ struct PythonStringHandler {
 
 struct PythonBoolHandler {
     void handle_type(
-            const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& m,
-            const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
-            const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
+            const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+            const ColumnMapping& m, const DecodePathData& shared_data, std::any& handler_data,
+            EncodingVersion encoding_version, const std::shared_ptr<StringPool>& string_pool,
+            const ReadOptions& read_options
     );
 
     [[nodiscard]] int type_size() const;
@@ -92,9 +95,10 @@ struct PythonBoolHandler {
 
 struct PythonArrayHandler {
     void handle_type(
-            const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& m,
-            const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
-            const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
+            const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+            const ColumnMapping& m, const DecodePathData& shared_data, std::any& handler_data,
+            EncodingVersion encoding_version, const std::shared_ptr<StringPool>& string_pool,
+            const ReadOptions& read_options
     );
 
     [[nodiscard]] int type_size() const;
