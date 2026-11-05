@@ -569,6 +569,17 @@ TEST(Segment, V2SerializedColumnBlockExceedingFooterOffsetThrowsOnLoad) {
     EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size()), CodecException);
 }
 
+TEST(Segment, V2TruncatedHeaderThrowsOnLoad) {
+    const auto stream_desc =
+            stream_descriptor(StreamId{"thing"}, RowCountIndex{}, {scalar_field(DataType::UINT8, "ints")});
+    auto seg = encode_v2(single_row_v2_test_segment(stream_desc), codec::default_lz4_codec());
+    auto vec = serialize_segment(seg);
+    for (size_t truncated_size : {size_t{0}, FIXED_HEADER_SIZE - 1, FIXED_HEADER_SIZE + 1}) {
+        std::vector<uint8_t> truncated(vec.begin(), vec.begin() + std::max(truncated_size, FIXED_HEADER_SIZE));
+        EXPECT_THROW(Segment::from_bytes(truncated.data(), truncated_size), CodecException) << truncated_size;
+    }
+}
+
 TEST(Segment, RoundtripStatisticsV1) {
     ScopedConfig reload_interval("Statistics.GenerateOnWrite", 1);
     const auto stream_desc = stream_descriptor(

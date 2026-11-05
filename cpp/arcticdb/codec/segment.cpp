@@ -202,6 +202,12 @@ struct DeserializedSegmentData {
 
 DeserializedSegmentData decode_header_and_fields(const uint8_t*& src, bool copy_data, size_t readable_size) {
     util::check(src != nullptr, "Got null data ptr from segment");
+    codec::check<ErrorCode::E_DECODE_ERROR>(
+            readable_size >= FIXED_HEADER_SIZE,
+            "Segment size {} is smaller than the fixed header size {}",
+            readable_size,
+            FIXED_HEADER_SIZE
+    );
     auto* fixed_hdr = reinterpret_cast<const FixedHeader*>(src);
     ARCTICDB_DEBUG(
             log::codec(),
@@ -216,6 +222,13 @@ DeserializedSegmentData decode_header_and_fields(const uint8_t*& src, bool copy_
             "expected first 2 bytes: {}, actual {}",
             fixed_hdr->magic_number,
             MAGIC_NUMBER
+    );
+    codec::check<ErrorCode::E_DECODE_ERROR>(
+            fixed_hdr->header_bytes <= readable_size - FIXED_HEADER_SIZE,
+            "Segment header size {} plus fixed header size {} exceeds total size {}",
+            fixed_hdr->header_bytes,
+            FIXED_HEADER_SIZE,
+            readable_size
     );
     std::optional<SegmentHeaderProtoWrapper> proto_wrapper;
 

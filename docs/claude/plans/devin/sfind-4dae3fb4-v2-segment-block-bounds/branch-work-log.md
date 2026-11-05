@@ -5,3 +5,4 @@
 - `Segment::from_bytes`/`from_buffer` now reject V2 segments whose `footer_offset` exceeds the readable size, or whose header and body field compressed sizes exceed `footer_offset`.
 - Added C++ regression tests in `codec/test/test_codec.cpp` for oversized metadata blocks, oversized column blocks at decode time, and tampered serialized footers.
 - Local build not possible (network-restricted VM, no vcpkg deps); verification relies on CI.
+- Review follow-up: `decode_header_and_fields` validates the fixed header and `header_bytes` against the readable size before deserializing the header; added truncated-header test; documented the decoding-safety checks in `docs/claude/cpp/CODEC.md`.
