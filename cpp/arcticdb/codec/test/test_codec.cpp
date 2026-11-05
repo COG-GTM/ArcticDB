@@ -503,6 +503,83 @@ TEST(Segment, RoundtripTimeseriesDescriptorWriteToBufferV2) {
     ASSERT_EQ(decoded, copy);
 }
 
+namespace {
+SegmentInMemory single_row_v2_test_segment(const StreamDescriptor& stream_desc) {
+    SegmentInMemory in_mem_seg{stream_desc.clone()};
+    in_mem_seg.set_scalar<uint8_t>(0, 23);
+    in_mem_seg.end_row();
+    TimeseriesDescriptor tsd;
+    tsd.set_total_rows(1);
+    tsd.set_stream_descriptor(stream_desc);
+    in_mem_seg.set_timeseries_descriptor(tsd);
+    return in_mem_seg;
+}
+
+std::vector<uint8_t> serialize_segment(Segment& seg) {
+    std::vector<uint8_t> vec(seg.calculate_size());
+    seg.write_to(vec.data());
+    return vec;
+}
+} // namespace
+
+TEST(Segment, V2MetadataBlockExceedingBufferThrows) {
+    const auto stream_desc =
+            stream_descriptor(StreamId{"thing"}, RowCountIndex{}, {scalar_field(DataType::UINT8, "ints")});
+    auto seg = encode_v2(single_row_v2_test_segment(stream_desc), codec::default_lz4_codec());
+    ASSERT_TRUE(seg.header().has_metadata_field());
+    auto& metadata_block = const_cast<EncodedBlock&>(seg.header().metadata_field().values(0));
+    metadata_block.set_out_bytes(std::numeric_limits<uint32_t>::max());
+    SegmentInMemory decoded{stream_desc.clone()};
+    EXPECT_THROW(decode_v2(seg, seg.header(), decoded, seg.descriptor()), CodecException);
+}
+
+TEST(Segment, V2ColumnBlockExceedingBufferThrowsOnDecode) {
+    const auto stream_desc =
+            stream_descriptor(StreamId{"thing"}, RowCountIndex{}, {scalar_field(DataType::UINT8, "ints")});
+    auto seg = encode_v2(single_row_v2_test_segment(stream_desc), codec::default_lz4_codec());
+    auto vec = serialize_segment(seg);
+    auto unserialized = Segment::from_bytes(vec.data(), vec.size(), true);
+    ASSERT_EQ(unserialized.header().body_fields().size(), 1u);
+    auto& column_block = const_cast<EncodedBlock&>(unserialized.header().body_fields().at(0).values(0));
+    column_block.set_out_bytes(std::numeric_limits<uint32_t>::max());
+    SegmentInMemory decoded{stream_desc.clone()};
+    EXPECT_THROW(decode_v2(unserialized, unserialized.header(), decoded, unserialized.descriptor()), CodecException);
+}
+
+TEST(Segment, V2SerializedColumnBlockExceedingFooterOffsetThrowsOnLoad) {
+    const auto stream_desc =
+            stream_descriptor(StreamId{"thing"}, RowCountIndex{}, {scalar_field(DataType::UINT8, "ints")});
+    auto seg = encode_v2(single_row_v2_test_segment(stream_desc), codec::default_passthrough_codec());
+    auto vec = serialize_segment(seg);
+
+    std::array<uint8_t, sizeof(EncodedBlock)> original_block{};
+    {
+        auto unserialized = Segment::from_bytes(vec.data(), vec.size(), true);
+        ASSERT_EQ(unserialized.header().body_fields().size(), 1u);
+        std::memcpy(original_block.data(), &unserialized.header().body_fields().at(0).values(0), sizeof(EncodedBlock));
+    }
+    auto it = std::search(vec.begin(), vec.end(), original_block.begin(), original_block.end());
+    ASSERT_NE(it, vec.end());
+
+    EncodedBlock tampered_block;
+    std::memcpy(&tampered_block, &*it, sizeof(EncodedBlock));
+    tampered_block.set_out_bytes(std::numeric_limits<uint32_t>::max());
+    std::memcpy(&*it, &tampered_block, sizeof(EncodedBlock));
+
+    EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size()), CodecException);
+}
+
+TEST(Segment, V2TruncatedHeaderThrowsOnLoad) {
+    const auto stream_desc =
+            stream_descriptor(StreamId{"thing"}, RowCountIndex{}, {scalar_field(DataType::UINT8, "ints")});
+    auto seg = encode_v2(single_row_v2_test_segment(stream_desc), codec::default_lz4_codec());
+    auto vec = serialize_segment(seg);
+    for (size_t truncated_size : {size_t{0}, FIXED_HEADER_SIZE - 1, FIXED_HEADER_SIZE + 1}) {
+        std::vector<uint8_t> truncated(vec.begin(), vec.begin() + std::max(truncated_size, FIXED_HEADER_SIZE));
+        EXPECT_THROW(Segment::from_bytes(truncated.data(), truncated_size), CodecException) << truncated_size;
+    }
+}
+
 TEST(Segment, RoundtripStatisticsV1) {
     ScopedConfig reload_interval("Statistics.GenerateOnWrite", 1);
     const auto stream_desc = stream_descriptor(

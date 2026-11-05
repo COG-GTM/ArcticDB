@@ -150,6 +150,16 @@ Segment from Storage
 Raw Data
 ```
 
+### Decoding Safety
+
+Sizes read from a stored segment are untrusted and are bounded before any block is decompressed:
+
+- `decode_header_and_fields` (`segment.cpp`) checks that the fixed header and `header_bytes` fit in the readable size, and for V2 that `footer_offset` fits and the header fields' compressed sizes do not exceed it.
+- `check_v2_fields_size` (`segment.cpp`, called from `Segment::from_bytes`/`from_buffer`) checks that header plus body field compressed sizes (including `ColumnMagic`) do not exceed `footer_offset`.
+- `check_compressed_size_in_bounds` (`codec-inl.hpp`) is called in `codec.cpp` before decoding metadata, descriptor, index descriptor, string pool and each column, against the segment body end.
+
+Violations raise `CodecException` (`E_DECODE_ERROR`).
+
 ## Key Classes
 
 ### Segment

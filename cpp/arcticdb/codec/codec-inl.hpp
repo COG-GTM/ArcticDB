@@ -22,6 +22,20 @@
 
 namespace arcticdb {
 
+inline void check_compressed_size_in_bounds(
+        std::size_t compressed_size, const std::uint8_t* data, const std::uint8_t* end, std::string_view what,
+        std::string_view name = {}
+) {
+    codec::check<ErrorCode::E_DECODE_ERROR>(
+            data <= end && compressed_size <= static_cast<std::size_t>(end - data),
+            "{} {} compressed size {} exceeds the {} bytes remaining in the segment buffer",
+            what,
+            name,
+            compressed_size,
+            data <= end ? end - data : 0
+    );
+}
+
 template<typename T, typename BlockType>
 void decode_block(const BlockType& block, const std::uint8_t* input, T* output) {
     ARCTICDB_SUBSAMPLE_AGG(DecodeBlock)
