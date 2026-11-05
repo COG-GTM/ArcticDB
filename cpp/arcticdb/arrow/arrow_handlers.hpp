@@ -14,9 +14,10 @@ namespace arcticdb {
 
 struct ArrowStringHandler {
     void handle_type(
-            const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& m,
-            const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
-            const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
+            const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+            const ColumnMapping& m, const DecodePathData& shared_data, std::any& handler_data,
+            EncodingVersion encoding_version, const std::shared_ptr<StringPool>& string_pool,
+            const ReadOptions& read_options
     );
 
     void convert_type(
@@ -41,9 +42,10 @@ struct ArrowStringHandler {
 
 struct ArrowBoolHandler {
     void handle_type(
-            const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& m,
-            const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
-            const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
+            const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+            const ColumnMapping& m, const DecodePathData& shared_data, std::any& handler_data,
+            EncodingVersion encoding_version, const std::shared_ptr<StringPool>& string_pool,
+            const ReadOptions& read_options
     );
 
     void convert_type(

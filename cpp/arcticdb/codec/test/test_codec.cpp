@@ -18,6 +18,8 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 namespace arcticdb {
 struct ColumnEncoderV1 {
     static std::pair<size_t, size_t> max_compressed_size(
@@ -501,6 +503,65 @@ TEST(Segment, RoundtripTimeseriesDescriptorWriteToBufferV2) {
     decode_v2(unserialized, unserialized.header(), decoded, unserialized.descriptor());
     ASSERT_EQ(decoded.index_descriptor().total_rows(), 23);
     ASSERT_EQ(decoded, copy);
+}
+
+namespace {
+SegmentInMemory oversized_block_test_segment(const StreamDescriptor& stream_desc) {
+    SegmentInMemory in_mem_seg{stream_desc.clone()};
+    for (auto i = 0UL; i < 100; ++i) {
+        in_mem_seg.set_scalar<uint64_t>(0, i);
+        in_mem_seg.end_row();
+    }
+    return in_mem_seg;
+}
+
+void set_first_value_block_out_bytes(const EncodedFieldImpl& field, uint32_t out_bytes) {
+    const_cast<EncodedBlock&>(field.ndarray().values(0)).set_out_bytes(out_bytes);
+}
+
+void check_oversized_block_rejected_v1(const arcticdb::proto::encoding::VariantCodec& codec_opts) {
+    const auto stream_desc =
+            stream_descriptor(StreamId{"thing"}, RowCountIndex{}, {scalar_field(DataType::UINT64, "ints")});
+    auto seg = encode_v1(oversized_block_test_segment(stream_desc), codec_opts);
+    std::vector<uint8_t> vec(seg.calculate_size());
+    seg.write_to(vec.data());
+    auto unserialized = Segment::from_bytes(vec.data(), vec.size());
+    set_first_value_block_out_bytes(unserialized.header().body_fields().at(0), std::numeric_limits<uint32_t>::max());
+
+    SegmentInMemory decoded{stream_desc.clone()};
+    EXPECT_THROW(decode_v1(unserialized, unserialized.header(), decoded, unserialized.descriptor()), CodecException);
+}
+} // namespace
+
+TEST(Segment, OversizedBlockRejectedV1Lz4) { check_oversized_block_rejected_v1(codec::default_lz4_codec()); }
+
+TEST(Segment, OversizedBlockRejectedV1Passthrough) {
+    check_oversized_block_rejected_v1(codec::default_passthrough_codec());
+}
+
+TEST(Segment, OversizedBlockRejectedV2) {
+    const auto stream_desc =
+            stream_descriptor(StreamId{"thing"}, RowCountIndex{}, {scalar_field(DataType::UINT64, "ints")});
+    // Passthrough keeps the encoded fields uncompressed in the footer so they can be patched in place
+    auto seg = encode_v2(oversized_block_test_segment(stream_desc), codec::default_passthrough_codec());
+    std::vector<uint8_t> vec(seg.calculate_size());
+    seg.write_to(vec.data());
+    auto unserialized = Segment::from_bytes(vec.data(), vec.size());
+
+    const auto& field = unserialized.header().body_fields().at(0);
+    const auto* field_ptr = reinterpret_cast<const uint8_t*>(&field);
+    const std::vector<uint8_t> original(field_ptr, field_ptr + encoded_field_bytes(field));
+    set_first_value_block_out_bytes(field, std::numeric_limits<uint32_t>::max());
+    const std::vector<uint8_t> patched(field_ptr, field_ptr + original.size());
+
+    auto footer = vec.begin() + (unserialized.buffer().data() - vec.data()) + unserialized.header().footer_offset();
+    auto it = std::search(footer, vec.end(), original.begin(), original.end());
+    ASSERT_NE(it, vec.end());
+    std::copy(patched.begin(), patched.end(), it);
+
+    SegmentInMemory decoded{stream_desc.clone()};
+    EXPECT_THROW(decode_v2(unserialized, unserialized.header(), decoded, unserialized.descriptor()), CodecException);
+    EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size()), CodecException);
 }
 
 TEST(Segment, RoundtripStatisticsV1) {

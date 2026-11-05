@@ -230,7 +230,8 @@ void decode_string_pool(
                 data,
                 context.string_pool(),
                 bv,
-                hdr.encoding_version()
+                hdr.encoding_version(),
+                end
         );
 
         ARCTICDB_TRACE(log::codec(), "Decoded string pool to position {}", data - begin);
@@ -239,7 +240,7 @@ void decode_string_pool(
 
 void decode_index_field(
         SegmentInMemory& frame, const EncodedFieldImpl& field, const uint8_t*& data,
-        const uint8_t* begin ARCTICDB_UNUSED, const uint8_t* end ARCTICDB_UNUSED, PipelineContextRow& context,
+        const uint8_t* begin ARCTICDB_UNUSED, const uint8_t* end, PipelineContextRow& context,
         EncodingVersion encoding_version
 ) {
     if (get_index_field_count(frame)) {
@@ -249,6 +250,7 @@ void decode_index_field(
             if (encoding_version == EncodingVersion::V2)
                 size += sizeof(ColumnMagic);
 
+            check_encoded_bytes_in_bounds(data, size, end, "skipped index column");
             data += size;
         } else {
             auto& buffer = frame.column(0).data().buffer();
@@ -276,7 +278,7 @@ void decode_index_field(
             );
 
             std::optional<util::BitMagic> bv;
-            data += decode_field(frame_field_descriptor.type(), field, data, sink, bv, encoding_version);
+            data += decode_field(frame_field_descriptor.type(), field, data, sink, bv, encoding_version, end);
             util::check(!bv, "Unexpected sparse vector in index field");
             ARCTICDB_DEBUG(log::codec(), "Decoded index column {} to position {}", 0, data - begin);
         }
@@ -329,7 +331,7 @@ void handle_type_promotion(const ColumnMapping& m, Column& column) {
 }
 
 void decode_or_expand(
-        const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& encoded_field_info,
+        const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& encoded_field_info,
         const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
         const ColumnMapping& mapping, const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
 ) {
@@ -338,6 +340,7 @@ void decode_or_expand(
     if (auto handler = get_type_handler(read_options.output_format(), source_type_desc, dest_type_desc); handler) {
         handler->handle_type(
                 data,
+                end,
                 dest_column,
                 encoded_field_info,
                 mapping,
@@ -369,7 +372,7 @@ void decode_or_expand(
             // fast forward enumerator, which outweighs any savings from skipping the allocation.
             ChunkedBuffer dense_buffer = ChunkedBuffer::presized(uncompressed_bytes);
             SliceDataSink dense_sink{dense_buffer.data(), uncompressed_bytes};
-            data += decode_field(source_type_desc, encoded_field_info, data, dense_sink, bv, encoding_version);
+            data += decode_field(source_type_desc, encoded_field_info, data, dense_sink, bv, encoding_version, end);
 
             if (!bv.has_value()) {
                 bv = util::BitMagic();
@@ -404,7 +407,7 @@ void decode_or_expand(
             }
         } else {
             SliceDataSink sink(dest, dest_bytes);
-            data += decode_field(source_type_desc, encoded_field_info, data, sink, bv, encoding_version);
+            data += decode_field(source_type_desc, encoded_field_info, data, sink, bv, encoding_version, end);
             handle_type_promotion(mapping, dest_column);
         }
         handle_truncation(dest_column, mapping.truncate_);
@@ -458,7 +461,7 @@ ColumnTruncation get_truncate_range_from_index(
 ColumnTruncation get_truncate_range(
         const SegmentInMemory& frame, const PipelineContextRow& context, const ReadOptions& read_options,
         const ReadQuery& read_query, EncodingVersion encoding_version, const EncodedFieldImpl& index_field,
-        const uint8_t* index_field_offset
+        const uint8_t* index_field_offset, const uint8_t* segment_end
 ) {
     ColumnTruncation truncate_rows;
     const auto& row_range = context.slice_and_key().slice().row_range;
@@ -473,6 +476,7 @@ ColumnTruncation get_truncate_range(
                  &context,
                  &index_field,
                  index_field_offset,
+                 segment_end,
                  encoding_version](const IndexRange& index_filter) {
                     // Time filter is inclusive of both end points
                     const auto& time_filter = static_cast<const TimestampRange&>(index_filter);
@@ -492,7 +496,13 @@ ColumnTruncation get_truncate_range(
                             _index_column = std::make_shared<Column>(index_type);
                             std::optional<util::BitMagic> bv;
                             (void)decode_field(
-                                    index_type, index_field, index_field_offset, *_index_column, bv, encoding_version
+                                    index_type,
+                                    index_field,
+                                    index_field_offset,
+                                    *_index_column,
+                                    bv,
+                                    encoding_version,
+                                    segment_end
                             );
                             _index_column->set_row_data(_index_column->row_count() - 1);
                             _first_ts = *_index_column->scalar_at<timestamp>(0);
@@ -668,7 +678,7 @@ void decode_into_frame_static(
         const auto index_field_offset = data;
         decode_index_field(frame, index_field, data, begin, end, context, encoding_version);
         auto truncate_range = get_truncate_range(
-                frame, context, read_options, read_query, encoding_version, index_field, index_field_offset
+                frame, context, read_options, read_query, encoding_version, index_field, index_field_offset, end
         );
         if (context.fetch_index() && get_index_field_count(frame)) {
             handle_truncation(frame.column(0), truncate_range);
@@ -700,6 +710,7 @@ void decode_into_frame_static(
 
             decode_or_expand(
                     data,
+                    end,
                     column,
                     encoded_field,
                     shared_data,
@@ -765,7 +776,7 @@ void decode_into_frame_dynamic(
         auto index_field_offset = data;
         decode_index_field(frame, index_field, data, begin, end, context, encoding_version);
         auto truncate_range = get_truncate_range(
-                frame, context, read_options, read_query, encoding_version, index_field, index_field_offset
+                frame, context, read_options, read_query, encoding_version, index_field, index_field_offset, end
         );
         if (get_index_field_count(frame)) {
             handle_truncation(frame.column(0), truncate_range);
@@ -799,6 +810,7 @@ void decode_into_frame_dynamic(
 
             decode_or_expand(
                     data,
+                    end,
                     column,
                     encoded_field,
                     shared_data,

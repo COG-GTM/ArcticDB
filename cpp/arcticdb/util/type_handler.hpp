@@ -32,18 +32,20 @@ struct ITypeHandler {
         /// Handle decoding of a non-trivial type to internal object representation which can be handed over to Python
         /// zero-copy.
         /// @param[in] source Data to be decoded to Python objects
+        /// @param[in] source_end End of the segment buffer containing source
         /// @param[out] dest_column Column where the resulting Python objects are stored
         /// @param[in] mapping Describes where in the column to decode (essentially a range of bytes to fill inside the
         /// column)
         void handle_type(
-                const uint8_t*& source, Column& dest_column, const EncodedFieldImpl& encoded_field_info,
-                const ColumnMapping& mapping, const DecodePathData& shared_data, std::any& handler_data,
-                EncodingVersion encoding_version, const std::shared_ptr<StringPool>& string_pool,
-                const ReadOptions& read_options
+                const uint8_t*& source, const uint8_t* source_end, Column& dest_column,
+                const EncodedFieldImpl& encoded_field_info, const ColumnMapping& mapping,
+                const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
+                const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
         ) {
             folly::poly_call<0>(
                     *this,
                     source,
+                    source_end,
                     dest_column,
                     encoded_field_info,
                     mapping,

@@ -54,7 +54,7 @@ inline EncodingVersion encoding_version(const storage::LibraryDescriptor::Varian
             [](std::monostate) { return EncodingVersion::V1; }
     );
 }
-void set_body_fields(SegmentHeader& seg_hdr, const uint8_t* src);
+void set_body_fields(SegmentHeader& seg_hdr, const uint8_t* src, const uint8_t* end);
 
 /*
  * Segment contains compressed data as returned from storage. When reading data the next step will usually be to

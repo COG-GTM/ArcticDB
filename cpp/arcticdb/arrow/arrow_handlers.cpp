@@ -45,9 +45,10 @@ ArrowOutputStringFormat ArrowStringHandler::output_string_format(
 }
 
 void ArrowStringHandler::handle_type(
-        const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& m,
-        const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
-        const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
+        const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+        const ColumnMapping& m, const DecodePathData& shared_data, std::any& handler_data,
+        EncodingVersion encoding_version, const std::shared_ptr<StringPool>& string_pool,
+        const ReadOptions& read_options
 ) {
     ARCTICDB_SAMPLE(ArrowHandleString, 0)
     util::check(field.has_ndarray(), "String handler expected array");
@@ -76,7 +77,7 @@ void ArrowStringHandler::handle_type(
     };
 
     data += decode_field(
-            m.source_type_desc_, field, data, decoded_data, decoded_data.opt_sparse_map(), encoding_version
+            m.source_type_desc_, field, data, decoded_data, decoded_data.opt_sparse_map(), encoding_version, end
     );
     // Calling `set_row_data` should be done after `sparse_map` is modified by `decode_field`.
     // TODO: Refactor so that `last_logical_row` is inferred from sparse_map as described in #2932
@@ -455,9 +456,10 @@ void ArrowStringHandler::default_initialize(
 }
 
 void ArrowBoolHandler::handle_type(
-        const uint8_t*& data, Column& dest_column, const EncodedFieldImpl& field, const ColumnMapping& m,
-        const DecodePathData& shared_data, std::any& handler_data, EncodingVersion encoding_version,
-        const std::shared_ptr<StringPool>& string_pool, const ReadOptions& read_options
+        const uint8_t*& data, const uint8_t* end, Column& dest_column, const EncodedFieldImpl& field,
+        const ColumnMapping& m, const DecodePathData& shared_data, std::any& handler_data,
+        EncodingVersion encoding_version, const std::shared_ptr<StringPool>& string_pool,
+        const ReadOptions& read_options
 ) {
     util::check(field.has_ndarray(), "Bool handler expected array");
     const auto& ndarray = field.ndarray();
@@ -471,7 +473,7 @@ void ArrowBoolHandler::handle_type(
     };
 
     data += decode_field(
-            m.source_type_desc_, field, data, decoded_data, decoded_data.opt_sparse_map(), encoding_version
+            m.source_type_desc_, field, data, decoded_data, decoded_data.opt_sparse_map(), encoding_version, end
     );
     decoded_data.set_row_data(static_cast<ssize_t>(m.num_rows_) - 1);
 
