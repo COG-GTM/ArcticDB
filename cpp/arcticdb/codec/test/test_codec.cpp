@@ -338,6 +338,43 @@ TYPED_TEST(SegmentStringEncodingTest, EncodeStringsBasic) {
 using namespace arcticdb;
 namespace as = arcticdb::stream;
 
+template<typename EncodedFieldType>
+class SegmentArrayEncodingTest : public testing::Test {};
+
+TYPED_TEST_SUITE(SegmentArrayEncodingTest, EncodingVersions);
+
+TYPED_TEST(SegmentArrayEncodingTest, RoundtripMultipleArrayColumns) {
+    using TDT = TypeDescriptorTag<DataTypeTag<DataType::INT64>, DimensionTag<Dimension::Dim1>>;
+    constexpr size_t num_columns = 2;
+    constexpr size_t num_rows = 3;
+    auto desc = stream_descriptor(StreamId{"arrays"}, as::TimeseriesIndex::default_index(), {});
+    for (size_t i = 0; i < num_columns; ++i)
+        desc.add_field(FieldRef{static_cast<TypeDescriptor>(TDT{}), fmt::format("arr_{}", i)});
+
+    SegmentInMemory s(desc.clone());
+    for (size_t i = 0; i < num_rows; ++i) {
+        TestRow<TDT> row{timestamp(i), num_columns, int64_t(i)};
+        s.set_scalar(0, timestamp(i));
+        for (size_t j = 1; j <= num_columns; ++j) {
+            auto t = row[j - 1].get_tensor();
+            s.set_array(j, t);
+        }
+        s.end_row();
+    }
+
+    constexpr EncodingVersion encoding_version = TypeParam::value;
+    Segment seg = encode_dispatch(s.clone(), codec::default_lz4_codec(), encoding_version);
+    SegmentInMemory res = decode_segment(seg);
+    for (size_t i = 0; i < num_rows; ++i) {
+        TestRow<TDT> row{timestamp(i), num_columns, int64_t(i)};
+        for (size_t j = 1; j <= num_columns; ++j) {
+            auto t = res.tensor_at<int64_t>(i, j);
+            ASSERT_TRUE(t.has_value());
+            ASSERT_TRUE(row.check(j - 1, t.value()));
+        }
+    }
+}
+
 TEST(SegmentEncoderTest, StressTestString) {
     const size_t NumTests = 100000;
     const size_t VectorSize = 0x1000;
