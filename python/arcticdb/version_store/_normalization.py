@@ -38,6 +38,7 @@ from arcticdb.exceptions import (
     ArcticDbNotYetImplemented,
     NormalizationException,
     UnsortedDataException,
+    UnpicklingDisabledException,
 )
 from arcticdb.supported_types import DateRangeInput, time_types as supported_time_types
 from arcticdb.util._versions import IS_PANDAS_TWO, IS_PANDAS_ZERO
@@ -1443,6 +1444,9 @@ class MsgPackNormalizer(Normalizer):
             data = unpackb(data, raw=False)
             return pd.Timedelta(data).to_pytimedelta()
 
+        if code in (MsgPackSerialization.PY_PICKLE_2, MsgPackSerialization.PY_PICKLE_3):
+            _check_unpickling_allowed()
+
         if code == MsgPackSerialization.PY_PICKLE_2:
             # If stored in Python2 we want to use raw while unpacking.
             # https://github.com/msgpack/msgpack-python/blob/master/msgpack/_unpacker.pyx#L230
@@ -1474,9 +1478,23 @@ class MsgPackNormalizer(Normalizer):
         return unpackb(buff, raw=raw, ext_hook=self._ext_hook)
 
 
+def _is_unpickling_allowed():
+    return get_config_int("VersionStore.AllowUnpickle") != 0
+
+
+def _check_unpickling_allowed():
+    if not _is_unpickling_allowed():
+        raise UnpicklingDisabledException(
+            "Refusing to unpickle data read from storage because unpickling is disabled "
+            "(VersionStore.AllowUnpickle=0). Pickled payloads can execute arbitrary code when loaded; only re-enable "
+            "unpickling for libraries whose writers you fully trust."
+        )
+
+
 class Pickler(object):
     @staticmethod
     def read(data):
+        _check_unpickling_allowed()
         return pd.read_pickle(io.BytesIO(data))
 
     @staticmethod

@@ -24,6 +24,12 @@ class ArcticDbNotYetImplemented(ArcticException):
 ArcticNativeNotYetImplemented = ArcticDbNotYetImplemented
 
 
+class UnpicklingDisabledException(NormalizationException):
+    """Raised when reading a pickled payload while unpickling is disabled via ``VersionStore.AllowUnpickle``."""
+
+    pass
+
+
 class LibraryNotFound(ArcticException):
     pass
 
