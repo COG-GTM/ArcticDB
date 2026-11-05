@@ -1158,6 +1158,9 @@ class Library:
         - Retrieval can only be done in bulk. Calls to `read` will not support `date_range`, `query_builder` or `columns`.
         - The data cannot be updated or appended to via the update and append methods.
         - Writes cannot be deduplicated in any way.
+        - Reading pickled data executes code embedded in the payload. Readers of libraries whose writers they do not
+          fully trust can refuse to unpickle by setting the runtime option ``VersionStore.AllowUnpickle`` to 0, in which
+          case reads raise `UnpicklingDisabledException`.
 
         Parameters
         ----------

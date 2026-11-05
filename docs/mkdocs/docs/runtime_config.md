@@ -104,6 +104,26 @@ Values:
 * 0: Disable
 * 1: Enable (Default)
 
+### VersionStore.AllowUnpickle
+
+Controls whether pickled payloads read from storage are unpickled. Pickled data is produced by `write_pickle`, by
+`recursive_normalizers`, and by user metadata (on symbols or snapshots) that cannot be natively msgpack-serialized.
+
+Unpickling executes arbitrary code embedded in the payload. Anyone who can write to the storage backing a library
+(through ArcticDB or directly via the storage API) can therefore run code in every process that reads a pickled
+symbol or its metadata. Readers of libraries whose writers they do not fully trust should disable unpickling.
+
+When disabled, `read`, `read_metadata`, `read_metadata_batch`, `list_snapshots(load_metadata=True)` and any other
+call that encounters a pickled payload raises `arcticdb.exceptions.UnpicklingDisabledException` instead of
+unpickling it. Natively normalized data and msgpack-serializable metadata are unaffected.
+
+Unlike most options on this page, this option is checked every time a payload is decoded, not only when the `Library`
+is created. It does not affect writes; use the `strict_mode` library option to prevent writing pickled data.
+
+Values:
+* 0: Disable unpickling on read
+* 1: Enable (Default)
+
 ### VersionStore.RecursiveNormalizerMetastructure
 
 Controls whether the recursive normalizer will use meta structure V2

@@ -10,6 +10,7 @@ import datetime
 from email import errors
 import inspect
 import itertools
+import os
 import sys
 from collections import namedtuple
 from unittest.mock import patch, MagicMock
@@ -27,7 +28,7 @@ from numpy.testing import assert_equal, assert_array_equal
 from arcticdb_ext.version_store import SortedValue as _SortedValue
 
 from arcticdb import QueryBuilder
-from arcticdb.exceptions import ArcticDbNotYetImplemented, ArcticException
+from arcticdb.exceptions import ArcticDbNotYetImplemented, ArcticException, UnpicklingDisabledException
 from arcticdb.version_store._custom_normalizers import (
     register_normalizer,
     get_custom_normalizer,
@@ -52,6 +53,7 @@ from arcticdb.util.test import (
     CustomThing,
     TestCustomNormalizer,
     assert_frame_equal,
+    config_context,
     assert_series_equal,
 )
 from arcticdb.util._versions import IS_PANDAS_ZERO, IS_PANDAS_TWO
@@ -200,6 +202,86 @@ def test_decode_python3_pickle_in_msgpack_str():
     data = norm._msgpack_unpackb(packed)
     assert isinstance(data, str)
     assert data == "bananas"
+
+
+class _MkdirOnUnpickle:
+    def __init__(self, path):
+        self.path = str(path)
+
+    def __reduce__(self):
+        return os.mkdir, (self.path,)
+
+
+PY2_PICKLE_IN_MSGPACK = b"\xc7:f\xda\x007cemail.errors\nBoundaryError\np0\n(S'bananas'\np1\ntp2\nRp3\n."
+
+
+def test_unpickling_disabled_refuses_python3_pickle(tmp_path):
+    marker = tmp_path / "marker"
+    norm = MsgPackNormalizer()
+    packed = norm._msgpack_packb({"a": 1, "evil": _MkdirOnUnpickle(marker)})
+
+    with config_context("VersionStore.AllowUnpickle", 0):
+        with pytest.raises(UnpicklingDisabledException):
+            norm._msgpack_unpackb(packed)
+    assert not marker.exists()
+
+
+def test_unpickling_disabled_refuses_python2_pickle():
+    with config_context("VersionStore.AllowUnpickle", 0):
+        with pytest.raises(UnpicklingDisabledException):
+            test_msgpack_normalizer._msgpack_unpackb(PY2_PICKLE_IN_MSGPACK)
+
+
+def test_unpickling_disabled_still_decodes_non_pickled_msgpack():
+    obj = {"a": "1", "b": 2, "ts": pd.Timestamp("2018-01-12 09:15", tz="UTC"), "td": datetime.timedelta(seconds=3)}
+    packed = test_msgpack_normalizer._msgpack_packb(obj, disallow_pickle=True)
+    with config_context("VersionStore.AllowUnpickle", 0):
+        assert test_msgpack_normalizer._msgpack_unpackb(packed) == obj
+
+
+def test_unpickling_disabled_refuses_user_metadata(tmp_path):
+    marker = tmp_path / "marker"
+    udm = normalize_metadata({"evil": _MkdirOnUnpickle(marker)})
+
+    with config_context("VersionStore.AllowUnpickle", 0):
+        with pytest.raises(UnpicklingDisabledException):
+            denormalize_user_metadata(udm)
+    assert not marker.exists()
+
+
+def test_unpickling_allowed_when_enabled(tmp_path):
+    marker = tmp_path / "marker"
+    udm = normalize_metadata({"evil": _MkdirOnUnpickle(marker)})
+    with config_context("VersionStore.AllowUnpickle", 1):
+        denormalize_user_metadata(udm)
+    assert marker.exists()
+
+
+def test_unpickling_disabled_library_reads(lmdb_library, tmp_path):
+    lib = lmdb_library
+    df = pd.DataFrame({"col": [1, 2, 3]})
+    markers = {name: tmp_path / name for name in ("meta", "pickled", "snapshot")}
+    lib.write("meta_sym", df, metadata={"evil": _MkdirOnUnpickle(markers["meta"])})
+    lib.write_pickle("pickled_sym", {"evil": _MkdirOnUnpickle(markers["pickled"])})
+    lib.write("safe_sym", df, metadata={"a": 1})
+    lib.snapshot("snap", metadata={"evil": _MkdirOnUnpickle(markers["snapshot"])})
+
+    with config_context("VersionStore.AllowUnpickle", 0):
+        with pytest.raises(UnpicklingDisabledException):
+            lib.read_metadata("meta_sym")
+        with pytest.raises(UnpicklingDisabledException):
+            lib.read("meta_sym")
+        with pytest.raises(UnpicklingDisabledException):
+            lib.read("pickled_sym")
+        with pytest.raises(UnpicklingDisabledException):
+            lib.list_snapshots(load_metadata=True)
+
+        assert set(lib.list_snapshots(load_metadata=False)) == {"snap"}
+        safe = lib.read("safe_sym")
+        assert_frame_equal(safe.data, df)
+        assert safe.metadata == {"a": 1}
+
+    assert not any(m.exists() for m in markers.values())
 
 
 def test_decode_python3_pickle_in_msgpack_bytes():

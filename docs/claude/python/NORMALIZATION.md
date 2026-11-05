@@ -121,6 +121,15 @@ ArcticDB uses a type-based dispatch system. Normalizers inherit from `Normalizer
 | TimeFrame | `TimeFrameNormalizer` |
 | Arbitrary objects | `MsgPackNormalizer` (fallback) |
 
+## Pickled Payloads
+
+`MsgPackNormalizer._custom_pack` falls back to pickling (`ExtType(PY_PICKLE_3, ...)`) for objects msgpack cannot encode;
+`strict_mode` / `disallow_pickle` only controls this write side. On read, `MsgPackNormalizer._ext_hook` decodes
+`PY_PICKLE_2` / `PY_PICKLE_3` via `Pickler.read`. Both call `_check_unpickling_allowed()`, which raises
+`UnpicklingDisabledException` (a `NormalizationException`) when runtime config `VersionStore.AllowUnpickle` is `0`.
+This covers `write_pickle` data, user metadata and recursive-normalizer metastructs (`denormalize_user_metadata`).
+The setting is read on every decode and defaults to allowing unpickling for backwards compatibility.
+
 ## String Handling
 
 ### Dynamic Strings
