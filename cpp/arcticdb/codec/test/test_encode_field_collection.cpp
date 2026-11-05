@@ -40,3 +40,41 @@ TEST(EncodedFieldCollection, AddField) {
     auto b5 = read2.values(1);
     ASSERT_EQ(b5.in_bytes(), 5);
 }
+TEST(EncodedFieldCollection, RejectsBlockCountsBeyondBuffer) {
+    using namespace arcticdb;
+    EncodedFieldCollection fields;
+    auto* field = fields.add_field(2);
+    field->mutable_ndarray()->add_values(EncodingVersion::V2)->set_in_bytes(1);
+    field->add_values(EncodingVersion::V2)->set_in_bytes(2);
+
+    const auto& const_fields = fields;
+    ASSERT_EQ(const_fields.at(0).values(1).in_bytes(), 2);
+
+    field->values_count_ = 1'000'000;
+    ASSERT_THROW((void)const_fields.at(0), CodecException);
+    ASSERT_THROW((void)fields.at(0), CodecException);
+    ASSERT_THROW((void)*fields.begin(), CodecException);
+
+    EncodedFieldCollection regenerated{fields.release_data(), Buffer{}};
+    ASSERT_THROW(regenerated.regenerate_offsets(), CodecException);
+}
+
+TEST(EncodedFieldCollection, RejectsBlockIndexBeyondCounts) {
+    using namespace arcticdb;
+    EncodedFieldCollection fields;
+    auto* new_style = fields.add_field(3);
+    new_style->mutable_ndarray()->add_shapes();
+    new_style->add_values(EncodingVersion::V2);
+    new_style->add_values(EncodingVersion::V2);
+    ASSERT_NO_THROW((void)new_style->values(1));
+    ASSERT_THROW((void)new_style->values(2), ArcticException);
+
+    auto* old_style = fields.add_field(4);
+    old_style->mutable_ndarray()->add_shapes();
+    old_style->add_values(EncodingVersion::V1);
+    old_style->add_shapes();
+    old_style->add_values(EncodingVersion::V1);
+    ASSERT_NO_THROW((void)old_style->shapes(1));
+    ASSERT_THROW((void)old_style->shapes(2), ArcticException);
+    ASSERT_THROW((void)old_style->values(2), ArcticException);
+}

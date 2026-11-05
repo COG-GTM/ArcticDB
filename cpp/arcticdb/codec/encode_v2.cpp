@@ -341,7 +341,7 @@ static void encode_encoded_fields(
                     column.type()
             );
             auto column_data = column.data();
-            auto* column_field = encoded_fields.add_field(column_data.num_blocks());
+            auto* column_field = encoded_fields.add_field(calc_num_blocks<EncodingPolicyV2>(column_data));
             if (column.has_statistics())
                 column_field->set_statistics(column.get_statistics());
 

@@ -163,6 +163,8 @@ Raw Data
 
 `EncodedField` represents a compressed column with a descriptor, shapes (for V2), and values (compressed data blocks).
 
+An `EncodedFieldImpl` is a fixed header followed by `shapes_count_ + values_count_` `EncodedBlock` records, so its full size is `encoded_field_bytes(field)`. Because these counts come from storage, `EncodedFieldCollection` (`encoded_field_collection.hpp`) checks that the whole field, not just the fixed header, fits in the field buffer before returning it from `at()`, iteration or `regenerate_offsets()`. `SegmentHeader::deserialize_from_bytes()` also calls `validate_field_offsets()`, which requires header field offsets to be increasing, non-overlapping and in range. Violations raise `E_DECODE_ERROR`. On the write side, `add_field()` must be given the exact block count (`calc_num_blocks<EncodingPolicy>`), including shape blocks for array columns.
+
 ### Buffer
 
 `Buffer` class manages memory for segment data with `data()`, `size()`, and `resize()` methods.
