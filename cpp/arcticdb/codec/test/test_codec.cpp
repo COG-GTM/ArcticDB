@@ -824,3 +824,108 @@ TEST(Segment, TestIdenticalProduceSameHashesV2) {
 
     ASSERT_EQ(hash_1, hash_2);
 }
+
+namespace {
+std::vector<uint8_t> serialized_test_segment(EncodingVersion encoding_version) {
+    const auto stream_desc =
+            stream_descriptor(StreamId{"thing"}, RowCountIndex{}, {scalar_field(DataType::UINT8, "ints")});
+    SegmentInMemory in_mem_seg{stream_desc.clone()};
+    in_mem_seg.set_scalar<uint8_t>(0, 23);
+    in_mem_seg.end_row();
+    auto seg = encoding_version == EncodingVersion::V1 ? encode_v1(std::move(in_mem_seg), codec::default_lz4_codec())
+                                                       : encode_v2(std::move(in_mem_seg), codec::default_lz4_codec());
+    std::vector<uint8_t> vec(seg.calculate_size());
+    seg.write_to(vec.data());
+    return vec;
+}
+
+FixedHeader* fixed_header(std::vector<uint8_t>& vec) { return reinterpret_cast<FixedHeader*>(vec.data()); }
+
+HeaderData* header_data(std::vector<uint8_t>& vec) {
+    return reinterpret_cast<HeaderData*>(vec.data() + FIXED_HEADER_SIZE);
+}
+
+SegmentIdentifierHeader* identifier_header(std::vector<uint8_t>& vec) {
+    const auto offset = FIXED_HEADER_SIZE + fixed_header(vec)->header_bytes + sizeof(MetadataMagic) +
+                        sizeof(SegmentDescriptorMagic) + sizeof(SegmentDescriptorImpl);
+    return reinterpret_cast<SegmentIdentifierHeader*>(vec.data() + offset);
+}
+
+std::shared_ptr<Buffer> to_buffer(const std::vector<uint8_t>& vec) {
+    auto buffer = std::make_shared<Buffer>(vec.size());
+    memcpy(buffer->data(), vec.data(), vec.size());
+    return buffer;
+}
+} // namespace
+
+TEST(SegmentBounds, UncorruptedSegmentsDecode) {
+    for (auto version : {EncodingVersion::V1, EncodingVersion::V2}) {
+        auto vec = serialized_test_segment(version);
+        EXPECT_NO_THROW(Segment::from_bytes(vec.data(), vec.size()));
+        EXPECT_NO_THROW(Segment::from_buffer(to_buffer(vec)));
+    }
+}
+
+TEST(SegmentBounds, BufferSmallerThanFixedHeader) {
+    auto vec = serialized_test_segment(EncodingVersion::V2);
+    std::vector<uint8_t> truncated(vec.begin(), vec.begin() + FIXED_HEADER_SIZE / 2);
+    EXPECT_THROW(Segment::from_bytes(truncated.data(), truncated.size()), CodecException);
+}
+
+TEST(SegmentBounds, HeaderBytesLargerThanBufferV1) {
+    auto vec = serialized_test_segment(EncodingVersion::V1);
+    fixed_header(vec)->header_bytes = std::numeric_limits<int32_t>::max();
+    EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size()), CodecException);
+}
+
+TEST(SegmentBounds, HeaderBytesLargerThanBufferV2) {
+    auto vec = serialized_test_segment(EncodingVersion::V2);
+    fixed_header(vec)->header_bytes = std::numeric_limits<uint32_t>::max();
+    EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size()), CodecException);
+    EXPECT_THROW(Segment::from_buffer(to_buffer(vec)), CodecException);
+}
+
+TEST(SegmentBounds, FieldsBytesLargerThanHeader) {
+    auto vec = serialized_test_segment(EncodingVersion::V2);
+    header_data(vec)->field_buffer_.fields_bytes_ = std::numeric_limits<uint32_t>::max();
+    EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size(), true), CodecException);
+    EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size(), false), CodecException);
+}
+
+TEST(SegmentBounds, WrappedHeaderFieldBlockCount) {
+    auto vec = serialized_test_segment(EncodingVersion::V2);
+    ASSERT_GE(header_data(vec)->field_buffer_.fields_bytes_, sizeof(EncodedField));
+    auto* field = reinterpret_cast<EncodedField*>(vec.data() + FIXED_HEADER_SIZE + sizeof(HeaderData));
+    field->shapes_count_ = std::numeric_limits<uint32_t>::max();
+    field->values_count_ = 1;
+    EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size()), CodecException);
+}
+
+TEST(SegmentBounds, OffsetBytesLargerThanHeader) {
+    auto vec = serialized_test_segment(EncodingVersion::V2);
+    header_data(vec)->field_buffer_.offset_bytes_ = std::numeric_limits<uint32_t>::max() & ~uint32_t{7};
+    EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size()), CodecException);
+}
+
+TEST(SegmentBounds, StringIdentifierLargerThanBuffer) {
+    auto vec = serialized_test_segment(EncodingVersion::V2);
+    auto* identifier = identifier_header(vec);
+    ASSERT_EQ(identifier->type_, IdentifierType::STRING);
+    ASSERT_EQ(identifier->size_, 5U);
+    identifier->size_ = std::numeric_limits<uint32_t>::max();
+    EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size()), CodecException);
+}
+
+TEST(SegmentBounds, TruncatedAfterHeaderV2) {
+    auto vec = serialized_test_segment(EncodingVersion::V2);
+    const auto header_end = FIXED_HEADER_SIZE + fixed_header(vec)->header_bytes;
+    std::vector<uint8_t> truncated(vec.begin(), vec.begin() + header_end + sizeof(MetadataMagic));
+    EXPECT_THROW(Segment::from_bytes(truncated.data(), truncated.size()), CodecException);
+}
+
+TEST(SegmentBounds, FooterOffsetOverflow) {
+    auto vec = serialized_test_segment(EncodingVersion::V2);
+    header_data(vec)->footer_offset_ = std::numeric_limits<uint64_t>::max() - 1;
+    EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size()), CodecException);
+    EXPECT_THROW(Segment::from_buffer(to_buffer(vec)), CodecException);
+}

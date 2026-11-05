@@ -88,11 +88,27 @@ size_t calc_required_header_fields_bytes(const SegmentInMemory& in_mem_seg) {
     return required;
 }
 
-void SegmentHeader::deserialize_from_bytes(const uint8_t* data, bool copy_data) {
+namespace {
+void check_header_bytes_available(size_t required, size_t remaining, std::string_view what) {
+    codec::check<ErrorCode::E_DECODE_ERROR>(
+            required <= remaining,
+            "Truncated segment header reading {}: need {} bytes but only {} remain",
+            what,
+            required,
+            remaining
+    );
+}
+} // namespace
+
+void SegmentHeader::deserialize_from_bytes(const uint8_t* data, size_t header_bytes, bool copy_data) {
+    size_t remaining = header_bytes;
+    check_header_bytes_available(sizeof(HeaderData), remaining, "header data");
     memcpy(&data_, data, sizeof(HeaderData));
     data += sizeof(HeaderData);
+    remaining -= sizeof(HeaderData);
     ChunkedBuffer fields_buffer;
     const auto fields_bytes = data_.field_buffer_.fields_bytes_;
+    check_header_bytes_available(fields_bytes, remaining, "header fields");
 
     if (copy_data) {
         fields_buffer.ensure(fields_bytes);
@@ -101,14 +117,56 @@ void SegmentHeader::deserialize_from_bytes(const uint8_t* data, bool copy_data) 
         fields_buffer.add_external_block(data, fields_bytes);
     }
 
-    data += data_.field_buffer_.fields_bytes_;
-    Buffer offsets_buffer{data_.field_buffer_.offset_bytes_};
-    memcpy(offsets_buffer.data(), data, data_.field_buffer_.offset_bytes_);
-    data += offsets_buffer.bytes();
+    data += fields_bytes;
+    remaining -= fields_bytes;
+    const auto offset_bytes = data_.field_buffer_.offset_bytes_;
+    check_header_bytes_available(offset_bytes, remaining, "header field offsets");
+    codec::check<ErrorCode::E_DECODE_ERROR>(
+            offset_bytes % sizeof(uint64_t) == 0, "Invalid header field offsets size {}", offset_bytes
+    );
+    Buffer offsets_buffer{offset_bytes};
+    memcpy(offsets_buffer.data(), data, offset_bytes);
+    data += offset_bytes;
+    remaining -= offset_bytes;
     header_fields_ = EncodedFieldCollection{std::move(fields_buffer), std::move(offsets_buffer)};
-    auto* offsets = reinterpret_cast<const uint32_t*>(data);
-    for (auto i = 0UL; i < offset_.size(); ++i)
-        offset_[i] = *offsets++;
+    check_header_bytes_available(sizeof(offset_), remaining, "field positions");
+    memcpy(offset_.data(), data, sizeof(offset_));
+    validate_header_field_bounds();
+}
+
+void SegmentHeader::validate_header_field_bounds() const {
+    const auto data_bytes = header_fields_.data_bytes();
+    for (auto i = 0U; i < static_cast<size_t>(FieldOffset::COUNT); ++i) {
+        const auto field_offset = FieldOffset(i);
+        if (!has_field(field_offset))
+            continue;
+
+        const auto pos = offset_[i];
+        codec::check<ErrorCode::E_DECODE_ERROR>(
+                pos < header_fields_.size(),
+                "Segment header field {} position {} out of range ({} fields)",
+                offset_name(field_offset),
+                pos,
+                header_fields_.size()
+        );
+        const auto field_start = header_fields_.get_offset(pos);
+        codec::check<ErrorCode::E_DECODE_ERROR>(
+                field_start <= data_bytes && EncodedFieldImpl::Size <= data_bytes - field_start,
+                "Segment header field {} at {} overflows header fields of size {}",
+                offset_name(field_offset),
+                field_start,
+                data_bytes
+        );
+        const auto field_bytes = encoded_field_bytes(header_fields_.to_field(field_start));
+        codec::check<ErrorCode::E_DECODE_ERROR>(
+                field_bytes <= data_bytes - field_start,
+                "Segment header field {} at {} with {} bytes overflows header fields of size {}",
+                offset_name(field_offset),
+                field_start,
+                field_bytes,
+                data_bytes
+        );
+    }
 }
 
 size_t SegmentHeader::required_bytes(const SegmentInMemory& in_mem_seg) {

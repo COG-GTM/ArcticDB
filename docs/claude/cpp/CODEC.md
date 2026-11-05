@@ -150,6 +150,10 @@ Segment from Storage
 Raw Data
 ```
 
+### Untrusted Segment Validation
+
+`Segment::from_bytes` and `Segment::from_buffer` treat segment bytes as untrusted. Before each read, `decode_header_and_fields` checks the length against the readable size. This covers the fixed header, `header_bytes`, V2 `HeaderData` (`fields_bytes_`, `offset_bytes_`, field positions and per-field block counts), metadata, segment descriptor, stream identifier and descriptor fields. `check_size` and the body size totals use overflow-safe arithmetic. Truncated or malformed segments raise `CodecException` (`E_DECODE_ERROR`). Tests: `SegmentBounds.*` in `codec/test/test_codec.cpp`.
+
 ## Key Classes
 
 ### Segment

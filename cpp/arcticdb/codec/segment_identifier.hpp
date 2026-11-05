@@ -9,6 +9,7 @@
 
 #include "arcticdb/storage/memory_layout.hpp"
 #include <arcticdb/entity/types.hpp>
+#include <arcticdb/util/preconditions.hpp>
 
 namespace arcticdb {
 
@@ -59,6 +60,21 @@ inline StreamId read_identifier(const uint8_t*& data) {
     default:
         util::raise_rte("Unknown identifier type in read_identifier");
     }
+}
+
+inline StreamId read_identifier(const uint8_t*& data, const uint8_t* end) {
+    codec::check<ErrorCode::E_DECODE_ERROR>(
+            data <= end && SegmentIdentifierSize <= static_cast<size_t>(end - data),
+            "Truncated segment reading stream identifier header"
+    );
+    const auto* identifier = reinterpret_cast<const SegmentIdentifier*>(data);
+    codec::check<ErrorCode::E_DECODE_ERROR>(
+            identifier->header_.type_ != IdentifierType::STRING ||
+                    identifier->header_.size_ <= static_cast<size_t>(end - data) - SegmentIdentifierSize,
+            "Truncated segment reading stream identifier of {} bytes",
+            identifier->header_.size_
+    );
+    return read_identifier(data);
 }
 
 inline void skip_identifier(const uint8_t*& data) {
