@@ -350,7 +350,7 @@ inline size_t calc_field_bytes(size_t num_blocks) {
 }
 
 inline size_t encoded_field_bytes(const EncodedField& encoded_field) {
-    return calc_field_bytes(encoded_field.shapes_count_ + encoded_field.values_count_);
+    return calc_field_bytes(static_cast<size_t>(encoded_field.shapes_count_) + encoded_field.values_count_);
 }
 
 } // namespace arcticdb

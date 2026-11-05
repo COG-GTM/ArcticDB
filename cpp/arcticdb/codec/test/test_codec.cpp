@@ -892,6 +892,15 @@ TEST(SegmentBounds, FieldsBytesLargerThanHeader) {
     EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size(), false), CodecException);
 }
 
+TEST(SegmentBounds, WrappedHeaderFieldBlockCount) {
+    auto vec = serialized_test_segment(EncodingVersion::V2);
+    ASSERT_GE(header_data(vec)->field_buffer_.fields_bytes_, sizeof(EncodedField));
+    auto* field = reinterpret_cast<EncodedField*>(vec.data() + FIXED_HEADER_SIZE + sizeof(HeaderData));
+    field->shapes_count_ = std::numeric_limits<uint32_t>::max();
+    field->values_count_ = 1;
+    EXPECT_THROW(Segment::from_bytes(vec.data(), vec.size()), CodecException);
+}
+
 TEST(SegmentBounds, OffsetBytesLargerThanHeader) {
     auto vec = serialized_test_segment(EncodingVersion::V2);
     header_data(vec)->field_buffer_.offset_bytes_ = std::numeric_limits<uint32_t>::max() & ~uint32_t{7};
