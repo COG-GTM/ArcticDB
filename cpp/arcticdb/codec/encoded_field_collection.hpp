@@ -22,6 +22,24 @@ constexpr TypeDescriptor encoded_fields_type_desc() {
     return TypeDescriptor{DataType::UINT8, Dimension::Dim0};
 }
 
+inline void check_encoded_field_in_bounds(size_t bytes_pos, size_t required_bytes, size_t buffer_bytes) {
+    codec::check<ErrorCode::E_DECODE_ERROR>(
+            bytes_pos <= buffer_bytes && required_bytes <= buffer_bytes - bytes_pos,
+            "Encoded field at position {} requires {} bytes, which overruns the {} byte field buffer",
+            bytes_pos,
+            required_bytes,
+            buffer_bytes
+    );
+}
+
+template<typename FieldType, typename BufferType>
+FieldType& encoded_field_at(BufferType& buffer, size_t bytes_pos) {
+    check_encoded_field_in_bounds(bytes_pos, EncodedFieldImpl::Size, buffer.bytes());
+    auto& field = *reinterpret_cast<FieldType*>(buffer.template ptr_cast<uint8_t>(bytes_pos, EncodedFieldImpl::Size));
+    check_encoded_field_in_bounds(bytes_pos, encoded_field_bytes(field), buffer.bytes());
+    return field;
+}
+
 class EncodedFieldCollection {
     ChunkedBuffer data_;
     Buffer offsets_;
@@ -35,9 +53,7 @@ class EncodedFieldCollection {
 
         explicit EncodedFieldCollectionIterator(ChunkedBuffer* buffer) : buffer_(buffer) {}
 
-        [[nodiscard]] EncodedFieldImpl& current() const {
-            return *reinterpret_cast<EncodedFieldImpl*>(buffer_->ptr_cast<uint8_t>(pos_, EncodedFieldImpl::Size));
-        }
+        [[nodiscard]] EncodedFieldImpl& current() const { return encoded_field_at<EncodedFieldImpl>(*buffer_, pos_); }
 
         EncodedFieldImpl& operator*() { return current(); }
 
@@ -92,18 +108,31 @@ class EncodedFieldCollection {
     }
 
     [[nodiscard]] const EncodedFieldImpl& to_field(size_t bytes_pos) const {
-        return *reinterpret_cast<const EncodedFieldImpl*>(
-                data_.ptr_cast<const uint8_t>(bytes_pos, EncodedFieldImpl::Size)
-        );
+        return encoded_field_at<const EncodedFieldImpl>(data_, bytes_pos);
     }
 
     [[nodiscard]] EncodedFieldImpl& to_field(size_t bytes_pos) {
-        return *reinterpret_cast<EncodedFieldImpl*>(data_.ptr_cast<uint8_t>(bytes_pos, EncodedFieldImpl::Size));
+        return encoded_field_at<EncodedFieldImpl>(data_, bytes_pos);
     }
 
     [[nodiscard]] const EncodedFieldImpl& at(size_t pos) const { return to_field(get_offset(pos)); }
 
     [[nodiscard]] EncodedFieldImpl& at(size_t pos) { return to_field(get_offset(pos)); }
+
+    void validate_field_offsets() const {
+        size_t previous_field_end = 0UL;
+        for (size_t i = 0UL; i < size(); ++i) {
+            const auto bytes_pos = get_offset(i);
+            codec::check<ErrorCode::E_DECODE_ERROR>(
+                    bytes_pos >= previous_field_end,
+                    "Encoded field {} at position {} overlaps previous field ending at {}",
+                    i,
+                    bytes_pos,
+                    previous_field_end
+            );
+            previous_field_end = bytes_pos + encoded_field_bytes(to_field(bytes_pos));
+        }
+    }
 
     void write_data_to(uint8_t*& dst) const {
         for (auto block : data_.blocks()) {

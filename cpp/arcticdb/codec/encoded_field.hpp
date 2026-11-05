@@ -244,17 +244,14 @@ struct EncodedFieldImpl : public EncodedField {
             util::check(n == 0, "Block index must be 0 not {} if not using old style shapes", n);
             return blocks()[0];
         } else {
+            util::check(n < shapes_count_, "Cannot return shape block {} from {} shapes", n, shapes_count_);
             return blocks()[n * 2];
         }
     }
 
     [[nodiscard]] const EncodedBlock& values(size_t n) const {
         util::check(
-                n < values_count_ + shapes_count_,
-                "Cannot return block {} from {} blocks ({} shapes)",
-                n,
-                values_count_,
-                shapes_count_
+                n < values_count_, "Cannot return block {} from {} blocks ({} shapes)", n, values_count_, shapes_count_
         );
         if (is_scalar() || !is_old_style_shapes())
             return blocks()[shapes_count_ + n];

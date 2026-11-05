@@ -88,3 +88,50 @@ TEST(SegmentHeader, SerializeUnserializeV1) {
         ASSERT_EQ(shape.in_bytes(), expected++);
     }
 }
+namespace {
+std::vector<uint8_t> serialized_header_with_string_pool() {
+    using namespace arcticdb;
+    SegmentHeader header{EncodingVersion::V2};
+    auto& string_pool_field = header.mutable_string_pool_field(2);
+    string_pool_field.mutable_ndarray()->add_values(EncodingVersion::V2)->set_in_bytes(23);
+    string_pool_field.mutable_ndarray()->add_values(EncodingVersion::V2)->set_in_bytes(47);
+    auto& descriptor_field = header.mutable_descriptor_field(1);
+    descriptor_field.mutable_ndarray()->add_values(EncodingVersion::V2)->set_in_bytes(11);
+    std::vector<uint8_t> bytes(header.bytes());
+    header.serialize_to_bytes(bytes.data(), bytes.size());
+    return bytes;
+}
+} // namespace
+
+TEST(SegmentHeader, DeserializeValidFields) {
+    using namespace arcticdb;
+    auto bytes = serialized_header_with_string_pool();
+    SegmentHeader header;
+    header.deserialize_from_bytes(bytes.data(), true);
+    ASSERT_EQ(header.string_pool_field().values(1).in_bytes(), 47);
+    ASSERT_EQ(header.descriptor_field().values(0).in_bytes(), 11);
+}
+
+TEST(SegmentHeader, DeserializeRejectsCorruptValuesCount) {
+    using namespace arcticdb;
+    auto bytes = serialized_header_with_string_pool();
+    const uint32_t corrupt_count = 1'000'000;
+    memcpy(bytes.data() + sizeof(HeaderData) + offsetof(EncodedField, values_count_),
+           &corrupt_count,
+           sizeof(corrupt_count));
+    SegmentHeader header;
+    ASSERT_THROW(header.deserialize_from_bytes(bytes.data(), true), CodecException);
+}
+
+TEST(SegmentHeader, DeserializeRejectsOverlappingFieldOffsets) {
+    using namespace arcticdb;
+    auto bytes = serialized_header_with_string_pool();
+    HeaderData data;
+    memcpy(&data, bytes.data(), sizeof(HeaderData));
+    const uint64_t overlapping_offset = 0;
+    memcpy(bytes.data() + sizeof(HeaderData) + data.field_buffer_.fields_bytes_ + sizeof(uint64_t),
+           &overlapping_offset,
+           sizeof(overlapping_offset));
+    SegmentHeader header;
+    ASSERT_THROW(header.deserialize_from_bytes(bytes.data(), true), CodecException);
+}
