@@ -259,10 +259,10 @@ std::optional<TimeseriesDescriptor> decode_timeseries_descriptor_v1(
     return unpack_timeseries_descriptor_from_proto(*maybe_any, descriptor, false);
 }
 
-void skip_descriptor(const uint8_t*& data, const SegmentHeader& hdr) {
+void skip_descriptor(const uint8_t*& data, const SegmentHeader& hdr, const uint8_t* end) {
     util::check_magic<SegmentDescriptorMagic>(data);
     data += sizeof(SegmentDescriptor);
-    skip_identifier(data);
+    skip_identifier(data, end);
     util::check_magic<DescriptorFieldsMagic>(data);
     if (hdr.has_descriptor_field() && hdr.descriptor_field().has_ndarray())
         data += encoding_sizes::field_compressed_size(hdr.descriptor_field());
@@ -280,12 +280,12 @@ std::optional<TimeseriesDescriptor> decode_timeseries_descriptor_v2(
     auto frame_meta =
             std::make_shared<arcticdb::proto::descriptors::FrameMetadata>(frame_metadata_from_any(*maybe_any));
 
-    skip_descriptor(data, hdr);
+    skip_descriptor(data, hdr, end);
 
     util::check_magic<IndexMagic>(data);
     auto frame_desc = std::make_shared<FrameDescriptorImpl>(read_frame_descriptor(data));
     auto segment_desc = std::make_shared<SegmentDescriptorImpl>(read_segment_descriptor(data));
-    auto segment_id = read_identifier(data);
+    auto segment_id = read_identifier(data, end);
     auto index_fields = decode_index_fields(hdr, data, begin, end);
     return std::make_optional<TimeseriesDescriptor>(
             frame_desc, segment_desc, frame_meta, std::move(index_fields), segment_id
@@ -408,14 +408,14 @@ void decode_v2(const Segment& segment, const SegmentHeader& hdr, SegmentInMemory
     auto data = begin;
     util::check_magic<MetadataMagic>(data);
     decode_metadata(hdr, data, begin, res);
-    skip_descriptor(data, hdr);
+    skip_descriptor(data, hdr, end);
 
     util::check_magic<IndexMagic>(data);
     if (hdr.has_index_descriptor_field()) {
         auto index_frame_descriptor = std::make_shared<FrameDescriptorImpl>(read_frame_descriptor(data));
         auto frame_metadata = extract_frame_metadata(res);
         auto index_segment_descriptor = std::make_shared<SegmentDescriptorImpl>(read_segment_descriptor(data));
-        auto index_segment_identifier = read_identifier(data);
+        auto index_segment_identifier = read_identifier(data, end);
         auto index_fields = decode_index_fields(hdr, data, begin, end);
         TimeseriesDescriptor tsd{
                 std::move(index_frame_descriptor),

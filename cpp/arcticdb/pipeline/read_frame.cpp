@@ -162,7 +162,7 @@ SegmentInMemory allocate_frame(const std::shared_ptr<PipelineContext>& context, 
 
 size_t get_index_field_count(const SegmentInMemory& frame) { return frame.descriptor().index().field_count(); }
 
-const uint8_t* skip_heading_fields(const SegmentHeader& hdr, const uint8_t*& data) {
+const uint8_t* skip_heading_fields(const SegmentHeader& hdr, const uint8_t*& data, const uint8_t* end) {
     const auto has_magic_numbers = hdr.encoding_version() == EncodingVersion::V2;
     const auto start [[maybe_unused]] = data;
     if (has_magic_numbers)
@@ -177,7 +177,7 @@ const uint8_t* skip_heading_fields(const SegmentHeader& hdr, const uint8_t*& dat
     if (has_magic_numbers) {
         util::check_magic<SegmentDescriptorMagic>(data);
         data += sizeof(SegmentDescriptor);
-        skip_identifier(data);
+        skip_identifier(data, end);
         util::check_magic<DescriptorFieldsMagic>(data);
     }
 
@@ -650,7 +650,7 @@ void decode_into_frame_static(
     const uint8_t* end = begin + seg.buffer().bytes();
     auto& hdr = seg.header();
     auto index_fieldcount = get_index_field_count(frame);
-    data = skip_heading_fields(hdr, data);
+    data = skip_heading_fields(hdr, data, end);
     context.set_descriptor(seg.descriptor());
     context.set_compacted(hdr.compacted());
     ARCTICDB_DEBUG(log::version(), "Num fields: {}", seg.descriptor().field_count());
@@ -749,7 +749,7 @@ void decode_into_frame_dynamic(
     const uint8_t* end = begin + seg.buffer().bytes();
     auto& hdr = seg.header();
     auto index_fieldcount = get_index_field_count(frame);
-    data = skip_heading_fields(hdr, data);
+    data = skip_heading_fields(hdr, data, end);
     context.set_descriptor(std::make_shared<StreamDescriptor>(seg.descriptor()));
     context.set_compacted(hdr.compacted());
 
