@@ -46,8 +46,27 @@ inline void write_identifier(Buffer& buffer, std::ptrdiff_t& pos, const StreamId
     );
 }
 
-inline StreamId read_identifier(const uint8_t*& data) {
+inline const SegmentIdentifier* checked_identifier(const uint8_t* data, const uint8_t* end) {
+    codec::check<ErrorCode::E_DECODE_ERROR>(
+            data != nullptr && end != nullptr && data <= end &&
+                    static_cast<size_t>(end - data) >= SegmentIdentifierSize,
+            "Segment identifier header exceeds segment buffer"
+    );
     auto* identifier = reinterpret_cast<const SegmentIdentifier*>(data);
+    if (identifier->header_.type_ == IdentifierType::STRING) {
+        const auto available = static_cast<size_t>(end - data) - SegmentIdentifierSize;
+        codec::check<ErrorCode::E_DECODE_ERROR>(
+                identifier->header_.size_ <= available,
+                "String segment identifier length {} exceeds remaining segment bytes {}",
+                identifier->header_.size_,
+                available
+        );
+    }
+    return identifier;
+}
+
+inline StreamId read_identifier(const uint8_t*& data, const uint8_t* end) {
+    auto* identifier = checked_identifier(data, end);
 
     switch (identifier->header_.type_) {
     case IdentifierType::STRING:
@@ -61,8 +80,8 @@ inline StreamId read_identifier(const uint8_t*& data) {
     }
 }
 
-inline void skip_identifier(const uint8_t*& data) {
-    auto* identifier = reinterpret_cast<const SegmentIdentifier*>(data);
+inline void skip_identifier(const uint8_t*& data, const uint8_t* end) {
+    auto* identifier = checked_identifier(data, end);
     switch (identifier->header_.type_) {
     case IdentifierType::STRING:
         data += SegmentIdentifierSize + identifier->header_.size_;
