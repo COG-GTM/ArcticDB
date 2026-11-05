@@ -375,6 +375,29 @@ TYPED_TEST(SegmentArrayEncodingTest, RoundtripMultipleArrayColumns) {
     }
 }
 
+TYPED_TEST(SegmentArrayEncodingTest, RoundtripEmptyArrayColumnFollowedByScalar) {
+    using TDT = TypeDescriptorTag<DataTypeTag<DataType::INT64>, DimensionTag<Dimension::Dim1>>;
+    constexpr size_t num_rows = 3;
+    auto desc = stream_descriptor(StreamId{"empty_arrays"}, as::TimeseriesIndex::default_index(), {});
+    desc.add_field(FieldRef{static_cast<TypeDescriptor>(TDT{}), "arr"});
+    desc.add_field(scalar_field(DataType::INT64, "ints"));
+
+    SegmentInMemory s(desc.clone());
+    for (size_t i = 0; i < num_rows; ++i) {
+        s.set_scalar(0, timestamp(i));
+        s.column(1).set_empty_array(static_cast<ssize_t>(i), 1);
+        s.set_scalar(2, int64_t(i * 10));
+        s.end_row();
+    }
+    ASSERT_EQ(s.column(1).data().num_blocks(), 0);
+
+    constexpr EncodingVersion encoding_version = TypeParam::value;
+    Segment seg = encode_dispatch(s.clone(), codec::default_lz4_codec(), encoding_version);
+    SegmentInMemory res = decode_segment(seg);
+    for (size_t i = 0; i < num_rows; ++i)
+        ASSERT_EQ(res.scalar_at<int64_t>(i, 2), int64_t(i * 10));
+}
+
 TEST(SegmentEncoderTest, StressTestString) {
     const size_t NumTests = 100000;
     const size_t VectorSize = 0x1000;

@@ -39,7 +39,9 @@ size_t calc_num_blocks(const ColumnData& column_data) {
     if constexpr (EncodingPolicyType::version == EncodingVersion::V1)
         return column_data.num_blocks() + (column_data.num_blocks() * !column_data.shapes()->empty());
     else
-        return column_data.num_blocks() + !column_data.shapes()->empty();
+        return column_data.num_blocks() + (column_data.num_blocks() > 0 && !column_data.shapes()->empty() &&
+                                           column_data.type().dimension() != Dimension::Dim0 &&
+                                           !is_empty_type(column_data.type().data_type()));
 }
 
 template<typename EncodingPolicyType>
