@@ -150,6 +150,8 @@ Segment from Storage
 Raw Data
 ```
 
+V2 header parsing is bounds-checked against the segment buffer: `read_identifier`/`skip_identifier` (`segment_identifier.hpp`) take an `end` pointer and raise `CodecException` (`E_DECODE_ERROR`) if the identifier header or string length runs past it, and `decode_header_and_fields` rejects `header_bytes` larger than the readable size.
+
 ## Key Classes
 
 ### Segment
